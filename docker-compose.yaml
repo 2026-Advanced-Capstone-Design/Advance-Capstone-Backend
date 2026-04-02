@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # ============ MySQL ============
+  mysql:
+    image: mysql:8.0
+    container_name: newslens-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root1234}
+      MYSQL_DATABASE: newslens
+      MYSQL_USER: newslens
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-newslens1234}
+      TZ: Asia/Seoul
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - newslens-network
+
+  # ============ Spring Boot Backend ============
+  backend:
+    build:
+      context: build/generated/sources/annotationProcessor/java/main
+      dockerfile: Dockerfile
+    container_name: newslens-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/newslens?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+      SPRING_DATASOURCE_USERNAME: newslens
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-newslens1234}
+      AI_ENGINE_URL: http://ai-engine:5000
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - newslens-network
+
+  # ============ Flask AI Engine ============
+  ai-engine:
+    build:
+      context: ./ai-engine
+      dockerfile: Dockerfile
+    container_name: newslens-ai-engine
+    environment:
+      FLASK_ENV: development
+    ports:
+      - "5000:5000"
+    networks:
+      - newslens-network
+
+volumes:
+  mysql-data:
+
+networks:
+  newslens-network:
+    driver: bridge
