@@ -28,7 +28,7 @@ services:
   # ============ Spring Boot Backend ============
   backend:
     build:
-      context: build/generated/sources/annotationProcessor/java/main
+      context: .
       dockerfile: Dockerfile
     container_name: newslens-backend
     environment:

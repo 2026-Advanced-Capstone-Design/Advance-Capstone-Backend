@@ -1,14 +1,12 @@
 package com.factcheck.domain;
 
-
 import com.factcheck.Enum.ArticleStatus;
 import com.factcheck.Enum.InputType;
 import jakarta.persistence.*;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.boot.autoconfigure.web.WebProperties;
 
-import javax.annotation.processing.Generated;
 import java.time.LocalDateTime;
 
 @Entity
@@ -19,36 +17,45 @@ public class Article {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column
+    @Column(name = "ARTICLE_ID")
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "input_type", nullable = false)
     private InputType inputType;
 
-    @Column(length = 500)
+    @Column(name = "title", length = 500)
     private String title;
 
-    @Column(length = 500)
+    @Column(name = "original_text", columnDefinition = "TEXT")
     private String originalText;
 
-    @Column(length = 2000)
-    private String sourceURL;
+    @Column(name = "source_url", length = 2000)
+    private String sourceUrl;
 
-    @Column(length = 2000)
+    @Column(name = "image_path", length = 500)
     private String imagePath;
 
     @Enumerated(EnumType.STRING)
-    private ArticleStatus articleStatus;
+    @Column(name = "status")
+    private ArticleStatus status;
 
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @PrePersist
-    public void beforePersist(){
+    @Builder
+    public Article(InputType inputType, String title, String originalText,
+                   String sourceUrl, String imagePath) {
+        this.inputType = inputType;
+        this.title = title;
+        this.originalText = originalText;
+        this.sourceUrl = sourceUrl;
+        this.imagePath = imagePath;
+        this.status = ArticleStatus.PENDING;
         this.createdAt = LocalDateTime.now();
     }
 
-
-
-
+    public void updateStatus(ArticleStatus status) {
+        this.status = status;
+    }
 }
