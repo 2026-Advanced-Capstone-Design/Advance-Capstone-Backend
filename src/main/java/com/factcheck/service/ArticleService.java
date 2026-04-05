@@ -12,6 +12,7 @@ import com.factcheck.repository.AnalysisCacheRepository;
 import com.factcheck.repository.AnalysisResultRepository;
 import com.factcheck.repository.ArticleRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.DigestUtils;
@@ -21,8 +22,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -31,6 +35,9 @@ public class ArticleService {
     private final ArticleRepository articleRepository;
     private final AnalysisResultRepository analysisResultRepository;
     private final AnalysisCacheRepository analysisCacheRepository;
+    private final CrawlerService crawlerService;
+    private final OcrService ocrService;
+    private final PreprocessService preprocessService;
 
     private static final String IMAGE_UPLOAD_DIR = "uploads/images/";
 
@@ -65,9 +72,14 @@ public class ArticleService {
         if (text == null || text.isBlank()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
+
+        List<String> sentences = preprocessService.splitOnly(text);
+        String processed = String.join("\n", sentences);
+        log.info("텍스트 전처리 완료: 원문 {}자 → {}개 문장", text.length(), sentences.size());
+
         Article article = Article.builder()
                 .inputType(InputType.TEXT)
-                .originalText(text)
+                .originalText(processed)
                 .build();
         articleRepository.save(article);
         return new AnalyzeResponse(article);
@@ -88,9 +100,25 @@ public class ArticleService {
                     return new AnalyzeResponse(cache.getArticle());
                 })
                 .orElseGet(() -> {
+                    // URL 크롤링
+                    Map<String, String> crawled = crawlerService.extractFromUrl(url);
+                    String body = crawled.get("body");
+                    String title = crawled.get("title");
+
+                    String processedText = "";
+                    if (body != null && !body.isBlank()) {
+                        List<String> sentences = preprocessService.splitOnly(body);
+                        processedText = String.join("\n", sentences);
+                        log.info("URL 크롤링 완료: {} - {}자", url, processedText.length());
+                    } else {
+                        log.warn("URL 크롤링 결과 본문 없음: {}", url);
+                    }
+
                     Article article = Article.builder()
                             .inputType(InputType.URL)
                             .sourceUrl(url)
+                            .title(title)
+                            .originalText(processedText)
                             .build();
                     articleRepository.save(article);
 
@@ -109,9 +137,26 @@ public class ArticleService {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
         String imagePath = saveImage(image);
+
+        // OCR 텍스트 추출
+        String ocrText = "";
+        try {
+            ocrText = ocrService.extractText(image);
+            if (!ocrText.isBlank()) {
+                List<String> sentences = preprocessService.splitOnly(ocrText);
+                ocrText = String.join("\n", sentences);
+                log.info("OCR 완료: {} - {}자", image.getOriginalFilename(), ocrText.length());
+            } else {
+                log.warn("OCR 결과 없음: {}", image.getOriginalFilename());
+            }
+        } catch (IOException e) {
+            log.error("OCR 처리 실패: {}", e.getMessage());
+        }
+
         Article article = Article.builder()
                 .inputType(InputType.IMAGE)
                 .imagePath(imagePath)
+                .originalText(ocrText)
                 .build();
         articleRepository.save(article);
         return new AnalyzeResponse(article);

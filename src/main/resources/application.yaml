@@ -16,5 +16,31 @@ spring:
       hibernate:
         format_sql: true
 
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
 server:
   port: 8080
+
+# Swagger UI
+springdoc:
+  swagger-ui:
+    path: /swagger-ui/index.html
+
+# OCR 설정
+ocr:
+  tessdata-path: /opt/homebrew/share/tessdata
+  language: kor+eng
+
+# Clova OCR fallback 설정
+clova:
+  ocr:
+    api-url: https://XXXX.apigw.ntruss.com/custom/v1/XXXX/XXXX/general
+    secret-key: your_clova_secret_key
+
+# Python AI 서버 주소 (추후 연동용)
+ai:
+  server:
+    url: http://localhost:5000
