@@ -18,3 +18,7 @@ spring:
 
 server:
   port: 8080
+
+youtube:
+  api:
+    key: ${YOUTUBE_API_KEY}
