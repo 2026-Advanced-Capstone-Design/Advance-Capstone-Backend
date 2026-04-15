@@ -5,15 +5,21 @@ import com.factcheck.global.exception.ErrorCode;
 import com.factcheck.youtube.dto.YoutubeAnalysisResultData;
 import com.factcheck.youtube.dto.YoutubeAnalysisResultResponse;
 import com.factcheck.youtube.dto.YoutubeAnalysisStartResponse;
+import com.factcheck.youtube.dto.YoutubeAiCommentAnalysis;
 import com.factcheck.youtube.dto.YoutubeCommentRequest;
 import com.factcheck.youtube.entity.YoutubeAnalysisRequest;
 import com.factcheck.youtube.entity.YoutubeAnalysisResult;
 import com.factcheck.youtube.repository.YoutubeAnalysisRequestRepository;
 import com.factcheck.youtube.repository.YoutubeAnalysisResultRepository;
 import com.factcheck.youtube.util.YoutubeUrlUtils;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +28,7 @@ public class YoutubeAnalysisService {
     private final YoutubeAnalysisRequestRepository youtubeAnalysisRequestRepository;
     private final YoutubeAnalysisResultRepository youtubeAnalysisResultRepository;
     private final YoutubeAnalysisAsyncService youtubeAnalysisAsyncService;
+    private final ObjectMapper objectMapper;
 
     public YoutubeAnalysisStartResponse startAnalysis(YoutubeCommentRequest request) {
         String youtubeId = YoutubeUrlUtils.extractVideoId(request.youtubeUrl());
@@ -71,7 +78,20 @@ public class YoutubeAnalysisService {
                 result.getBotCount(),
                 result.getBotPct(),
                 result.getSummary(),
-                result.getCommentsJson()
+                parseComments(result.getCommentsJson())
         );
+    }
+
+    private List<YoutubeAiCommentAnalysis> parseComments(String commentsJson) {
+        if (commentsJson == null || commentsJson.isBlank()) {
+            return List.of();
+        }
+
+        try {
+            return objectMapper.readValue(commentsJson, new TypeReference<>() {
+            });
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to parse analyzed comments.", e);
+        }
     }
 }

@@ -1,5 +1,7 @@
 package com.factcheck.youtube.dto;
 
+import java.util.List;
+
 public record YoutubeAnalysisResultData(
         String videoTitle,
         String videoCommentCount,
@@ -13,6 +15,6 @@ public record YoutubeAnalysisResultData(
         int botCount,
         double botPct,
         String summary,
-        String commentsJson
+        List<YoutubeAiCommentAnalysis> comments
 ) {
 }
