@@ -21,8 +21,8 @@ public class YoutubeAnalysisService {
 
     private final YoutubeAnalysisRequestRepository youtubeAnalysisRequestRepository;
     private final YoutubeAnalysisResultRepository youtubeAnalysisResultRepository;
+    private final YoutubeAnalysisAsyncService youtubeAnalysisAsyncService;
 
-    @Transactional
     public YoutubeAnalysisStartResponse startAnalysis(YoutubeCommentRequest request) {
         String youtubeId = YoutubeUrlUtils.extractVideoId(request.youtubeUrl());
         YoutubeAnalysisRequest analysisRequest = YoutubeAnalysisRequest.create(
@@ -31,6 +31,7 @@ public class YoutubeAnalysisService {
         );
 
         YoutubeAnalysisRequest savedRequest = youtubeAnalysisRequestRepository.save(analysisRequest);
+        youtubeAnalysisAsyncService.analyze(savedRequest.getId());
         return new YoutubeAnalysisStartResponse(
                 savedRequest.getRequestId(),
                 savedRequest.getYoutubeId(),

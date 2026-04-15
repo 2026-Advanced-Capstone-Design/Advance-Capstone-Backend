@@ -22,3 +22,7 @@ server:
 youtube:
   api:
     key: ${YOUTUBE_API_KEY}
+
+ai:
+  youtube:
+    analysis-url: ${YOUTUBE_AI_ANALYSIS_URL:http://localhost:5000/analyze}
