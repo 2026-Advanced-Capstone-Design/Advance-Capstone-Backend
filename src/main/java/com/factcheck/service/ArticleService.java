@@ -38,6 +38,7 @@ public class ArticleService {
     private final CrawlerService crawlerService;
     private final OcrService ocrService;
     private final PreprocessService preprocessService;
+    private final AiWorkerClient aiWorkerClient;
 
     private static final String IMAGE_UPLOAD_DIR = "uploads/images/";
 
@@ -82,6 +83,7 @@ public class ArticleService {
                 .originalText(processed)
                 .build();
         articleRepository.save(article);
+        aiWorkerClient.submitAnalysis(article);
         return new AnalyzeResponse(article);
     }
 
@@ -127,6 +129,7 @@ public class ArticleService {
                             .article(article)
                             .build());
 
+                    aiWorkerClient.submitAnalysis(article);
                     return new AnalyzeResponse(article);
                 });
     }
@@ -159,6 +162,7 @@ public class ArticleService {
                 .originalText(ocrText)
                 .build();
         articleRepository.save(article);
+        aiWorkerClient.submitAnalysis(article);
         return new AnalyzeResponse(article);
     }
 
