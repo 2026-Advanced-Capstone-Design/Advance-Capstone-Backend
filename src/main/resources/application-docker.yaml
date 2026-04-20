@@ -13,7 +13,3 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
-
-ai:
-  server:
-    url: ${AI_ENGINE_URL:http://ai-engine:5000}

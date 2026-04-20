@@ -35,10 +35,3 @@ out/
 
 ### VS Code ###
 .vscode/
-
-### Security ###
-*.pem
-*.key
-.env
-.env.prod
-application-local.yaml
