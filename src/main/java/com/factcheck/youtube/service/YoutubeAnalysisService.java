@@ -2,10 +2,10 @@ package com.factcheck.youtube.service;
 
 import com.factcheck.global.exception.BusinessException;
 import com.factcheck.global.exception.ErrorCode;
+import com.factcheck.youtube.dto.YoutubeAiCommentAnalysis;
 import com.factcheck.youtube.dto.YoutubeAnalysisResultData;
 import com.factcheck.youtube.dto.YoutubeAnalysisResultResponse;
 import com.factcheck.youtube.dto.YoutubeAnalysisStartResponse;
-import com.factcheck.youtube.dto.YoutubeAiCommentAnalysis;
 import com.factcheck.youtube.dto.YoutubeCommentRequest;
 import com.factcheck.youtube.entity.YoutubeAnalysisRequest;
 import com.factcheck.youtube.entity.YoutubeAnalysisResult;
@@ -49,7 +49,7 @@ public class YoutubeAnalysisService {
     @Transactional(readOnly = true)
     public YoutubeAnalysisResultResponse getAnalysis(String requestId) {
         YoutubeAnalysisRequest analysisRequest = youtubeAnalysisRequestRepository.findByRequestId(requestId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT));
+                .orElseThrow(() -> new BusinessException(ErrorCode.ANALYSIS_NOT_FOUND));
 
         YoutubeAnalysisResultData result = youtubeAnalysisResultRepository.findByAnalysisRequest(analysisRequest)
                 .map(this::toResultData)
@@ -91,7 +91,7 @@ public class YoutubeAnalysisService {
             return objectMapper.readValue(commentsJson, new TypeReference<>() {
             });
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to parse analyzed comments.", e);
+            throw new BusinessException(ErrorCode.AI_RESPONSE_INVALID);
         }
     }
 }

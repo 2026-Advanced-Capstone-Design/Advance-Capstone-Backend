@@ -25,4 +25,4 @@ youtube:
 
 ai:
   youtube:
-    analysis-url: ${YOUTUBE_AI_ANALYSIS_URL:http://localhost:5000/analyze}
+    analysis-url: ${YOUTUBE_AI_ANALYSIS_URL:https://4f16-182-224-124-102.ngrok-free.app/analyze/youtube}

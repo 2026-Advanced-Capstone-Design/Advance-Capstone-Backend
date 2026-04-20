@@ -1,5 +1,7 @@
 package com.factcheck.youtube.service;
 
+import com.factcheck.global.exception.BusinessException;
+import com.factcheck.global.exception.ErrorCode;
 import com.factcheck.youtube.dto.YoutubeAiAnalysisResponse;
 import com.factcheck.youtube.entity.YoutubeAnalysisRequest;
 import com.factcheck.youtube.entity.YoutubeAnalysisResult;
@@ -8,6 +10,7 @@ import com.factcheck.youtube.repository.YoutubeAnalysisResultRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -33,7 +36,7 @@ public class YoutubeAnalysisAsyncService {
 
             YoutubeAiAnalysisResponse aiResponse = youtubeAiAnalysisService.analyze(analysisRequest.getYoutubeId());
             if (aiResponse == null) {
-                throw new IllegalStateException("AI analysis response is empty.");
+                throw new BusinessException(ErrorCode.AI_RESPONSE_INVALID);
             }
 
             YoutubeAnalysisResult result = YoutubeAnalysisResult.create(
@@ -56,8 +59,14 @@ public class YoutubeAnalysisAsyncService {
 
             analysisRequest.markCompleted();
             youtubeAnalysisRequestRepository.save(analysisRequest);
+        } catch (BusinessException e) {
+            analysisRequest.markFailed(e.getMessage());
+            youtubeAnalysisRequestRepository.save(analysisRequest);
+        } catch (DataAccessException e) {
+            analysisRequest.markFailed(ErrorCode.ANALYSIS_RESULT_SAVE_FAILED.getMessage());
+            youtubeAnalysisRequestRepository.save(analysisRequest);
         } catch (Exception e) {
-            analysisRequest.markFailed(safeErrorMessage(e));
+            analysisRequest.markFailed(ErrorCode.INTERNAL_SERVER_ERROR.getMessage());
             youtubeAnalysisRequestRepository.save(analysisRequest);
         }
     }
@@ -68,15 +77,7 @@ public class YoutubeAnalysisAsyncService {
                     aiResponse.comments() == null ? List.of() : aiResponse.comments()
             );
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize analyzed comments.", e);
+            throw new BusinessException(ErrorCode.AI_RESPONSE_INVALID);
         }
-    }
-
-    private String safeErrorMessage(Exception e) {
-        String message = e.getMessage();
-        if (message == null || message.isBlank()) {
-            return "AI analysis failed.";
-        }
-        return message.length() > 1000 ? message.substring(0, 1000) : message;
     }
 }

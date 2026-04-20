@@ -27,7 +27,7 @@ public class YoutubeAnalysisController {
             @Valid @RequestBody YoutubeCommentRequest request
     ) {
         YoutubeAnalysisStartResponse response = youtubeAnalysisService.startAnalysis(request);
-        return ResponseEntity.ok(ApiResponse.ok(response, "Analysis request accepted."));
+        return ResponseEntity.ok(ApiResponse.ok(response, "분석 요청이 접수되었습니다."));
     }
 
     @GetMapping("/{requestId}")
@@ -35,6 +35,6 @@ public class YoutubeAnalysisController {
             @PathVariable String requestId
     ) {
         YoutubeAnalysisResultResponse response = youtubeAnalysisService.getAnalysis(requestId);
-        return ResponseEntity.ok(ApiResponse.ok(response, "Analysis request fetched."));
+        return ResponseEntity.ok(ApiResponse.ok(response, "분석 요청 조회 성공"));
     }
 }
