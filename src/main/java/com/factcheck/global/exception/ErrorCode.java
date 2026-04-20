@@ -7,7 +7,14 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
 
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "COMMON_001", "잘못된 요청입니다."),
-    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_999", "서버 내부 오류입니다.");
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_999", "서버 내부 오류입니다."),
+
+    ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "ARTICLE_001", "해당 기사를 찾을 수 없습니다."),
+    RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "ARTICLE_002", "분석 결과가 아직 없습니다."),
+    IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "ARTICLE_003", "이미지 업로드에 실패했습니다."),
+
+    AI_SERVER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "AI_001", "AI 분석 서버에 연결할 수 없습니다."),
+    AI_ANALYSIS_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "AI_002", "AI 분석 처리 중 오류가 발생했습니다.");
 
     private HttpStatus status;
     private String code;

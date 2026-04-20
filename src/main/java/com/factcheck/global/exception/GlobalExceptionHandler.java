@@ -19,7 +19,7 @@ public class GlobalExceptionHandler {
 
         Map<String, Object> body = new HashMap<>();
         body.put("code", errorCode.getCode());
-        body.put("messgae", errorCode.getMessage());
+        body.put("message", errorCode.getMessage());
 
         return ResponseEntity
                 .status(errorCode.getStatus())
