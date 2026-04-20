@@ -4,6 +4,9 @@ import java.util.List;
 
 public record YoutubeAnalysisResultData(
         String videoTitle,
+        String channelName,
+        Long viewCount,
+        String publishedAt,
         String videoCommentCount,
         int total,
         int positive,

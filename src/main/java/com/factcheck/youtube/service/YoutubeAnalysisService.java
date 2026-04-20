@@ -67,6 +67,9 @@ public class YoutubeAnalysisService {
     private YoutubeAnalysisResultData toResultData(YoutubeAnalysisResult result) {
         return new YoutubeAnalysisResultData(
                 result.getVideoTitle(),
+                result.getChannelName(),
+                result.getViewCount(),
+                result.getPublishedAt(),
                 result.getVideoCommentCount(),
                 result.getTotal(),
                 result.getPositive(),

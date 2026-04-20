@@ -42,6 +42,9 @@ public class YoutubeAnalysisAsyncService {
             YoutubeAnalysisResult result = YoutubeAnalysisResult.create(
                     analysisRequest,
                     aiResponse.videoTitle(),
+                    aiResponse.channelName(),
+                    aiResponse.viewCount(),
+                    aiResponse.publishedAt(),
                     aiResponse.videoCommentCount(),
                     aiResponse.total(),
                     aiResponse.positive(),

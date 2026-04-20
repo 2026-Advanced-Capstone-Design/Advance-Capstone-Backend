@@ -30,6 +30,15 @@ public class YoutubeAnalysisResult {
     @Column(name = "video_title", length = 500)
     private String videoTitle;
 
+    @Column(name = "channel_name", length = 255)
+    private String channelName;
+
+    @Column(name = "view_count")
+    private Long viewCount;
+
+    @Column(name = "published_at", length = 20)
+    private String publishedAt;
+
     @Column(name = "video_comment_count", length = 50)
     private String videoCommentCount;
 
@@ -80,6 +89,9 @@ public class YoutubeAnalysisResult {
     private YoutubeAnalysisResult(
             YoutubeAnalysisRequest analysisRequest,
             String videoTitle,
+            String channelName,
+            Long viewCount,
+            String publishedAt,
             String videoCommentCount,
             int total,
             int positive,
@@ -95,6 +107,9 @@ public class YoutubeAnalysisResult {
     ) {
         this.analysisRequest = analysisRequest;
         this.videoTitle = videoTitle;
+        this.channelName = channelName;
+        this.viewCount = viewCount;
+        this.publishedAt = publishedAt;
         this.videoCommentCount = videoCommentCount;
         this.total = total;
         this.positive = positive;
@@ -112,6 +127,9 @@ public class YoutubeAnalysisResult {
     public static YoutubeAnalysisResult create(
             YoutubeAnalysisRequest analysisRequest,
             String videoTitle,
+            String channelName,
+            Long viewCount,
+            String publishedAt,
             String videoCommentCount,
             int total,
             int positive,
@@ -128,6 +146,9 @@ public class YoutubeAnalysisResult {
         return new YoutubeAnalysisResult(
                 analysisRequest,
                 videoTitle,
+                channelName,
+                viewCount,
+                publishedAt,
                 videoCommentCount,
                 total,
                 positive,
@@ -165,6 +186,18 @@ public class YoutubeAnalysisResult {
 
     public String getVideoTitle() {
         return videoTitle;
+    }
+
+    public String getChannelName() {
+        return channelName;
+    }
+
+    public Long getViewCount() {
+        return viewCount;
+    }
+
+    public String getPublishedAt() {
+        return publishedAt;
     }
 
     public String getVideoCommentCount() {

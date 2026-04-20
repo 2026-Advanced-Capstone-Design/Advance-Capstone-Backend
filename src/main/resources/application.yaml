@@ -19,10 +19,6 @@ spring:
 server:
   port: 8080
 
-youtube:
-  api:
-    key: ${YOUTUBE_API_KEY}
-
 ai:
   youtube:
     analysis-url: ${YOUTUBE_AI_ANALYSIS_URL:https://4f16-182-224-124-102.ngrok-free.app/analyze/youtube}

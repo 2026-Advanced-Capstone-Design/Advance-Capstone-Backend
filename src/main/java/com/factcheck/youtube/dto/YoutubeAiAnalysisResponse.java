@@ -7,6 +7,12 @@ import java.util.List;
 public record YoutubeAiAnalysisResponse(
         @JsonProperty("video_title")
         String videoTitle,
+        @JsonProperty("channel_name")
+        String channelName,
+        @JsonProperty("view_count")
+        long viewCount,
+        @JsonProperty("published_at")
+        String publishedAt,
         @JsonProperty("video_comment_count")
         String videoCommentCount,
         int total,
