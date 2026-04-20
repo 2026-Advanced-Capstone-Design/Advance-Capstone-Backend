@@ -40,4 +40,5 @@ out/
 *.pem
 *.key
 .env
+.env.prod
 application-local.yaml

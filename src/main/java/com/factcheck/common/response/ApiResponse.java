@@ -10,6 +10,6 @@ public record ApiResponse<T> (
     }
 
     public static <T> ApiResponse<T> fail(T data, String message) {
-        return new ApiResponse<>(true, data, message);
+        return new ApiResponse<>(false, data, message);
     }
 }

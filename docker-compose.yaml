@@ -12,7 +12,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-newslens1234}
       TZ: Asia/Seoul
     ports:
-      - "3306:3306"
+      - "3308:3306"
     volumes:
       - mysql-data:/var/lib/mysql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -52,13 +52,19 @@ services:
     container_name: newslens-ai-engine
     environment:
       FLASK_ENV: development
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      CHROMA_PERSIST_DIR: /app/chroma_db
+      SPRING_CALLBACK_URL: http://backend:8080/api/v1/internal/callback
     ports:
       - "5000:5000"
+    volumes:
+      - chroma-data:/app/chroma_db
     networks:
       - newslens-network
 
 volumes:
   mysql-data:
+  chroma-data:
 
 networks:
   newslens-network:

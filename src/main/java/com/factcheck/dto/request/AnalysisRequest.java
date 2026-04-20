@@ -18,6 +18,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class AnalysisRequest {
 
+    // 이 부분은 프론트에서 누르면 post 한것을 받는 형식으로
     @NotNull(message = "input_type은 필수입니다. (TEXT / IMAGE / URL)")
     private InputType inputType;
 
