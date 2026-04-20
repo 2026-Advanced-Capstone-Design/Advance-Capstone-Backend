@@ -21,4 +21,4 @@ server:
 
 ai:
   youtube:
-    analysis-url: ${YOUTUBE_AI_ANALYSIS_URL:https://4f16-182-224-124-102.ngrok-free.app/analyze/youtube}
+    analysis-url: ${YOUTUBE_AI_ANALYSIS_URL}
