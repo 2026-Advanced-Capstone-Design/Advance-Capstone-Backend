@@ -18,3 +18,7 @@ spring:
 
 server:
   port: 8080
+
+ai:
+  youtube:
+    analysis-url: ${YOUTUBE_AI_ANALYSIS_URL}
