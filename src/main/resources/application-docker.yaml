@@ -14,6 +14,6 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
 
-# AI 엔진 연동 URL
-ai-engine:
-  url: ${AI_ENGINE_URL:http://localhost:5000}
+ai:
+  server:
+    url: ${AI_ENGINE_URL:http://ai-engine:5000}
