@@ -18,4 +18,9 @@ public class RestClientConfig {
                 .defaultHeader("Content-Type", "application/json")
                 .build();
     }
+
+    @Bean
+    public RestClient restClient() {
+        return RestClient.create();
+    }
 }

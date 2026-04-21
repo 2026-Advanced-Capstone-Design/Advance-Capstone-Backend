@@ -40,7 +40,8 @@ clova:
     api-url: https://XXXX.apigw.ntruss.com/custom/v1/XXXX/XXXX/general
     secret-key: your_clova_secret_key
 
-# Python AI 서버 주소 (추후 연동용)
 ai:
   server:
     url: http://localhost:5000
+  youtube:
+    analysis-url: ${YOUTUBE_AI_ANALYSIS_URL:http://localhost:8000}
