@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: newslens-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root1234}
+      MYSQL_DATABASE: newslens
+      MYSQL_USER: newslens
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-newslens1234}
+      TZ: Asia/Seoul
+    volumes:
+      - mysql-data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - newslens-network
+
+  backend:
+    image: jaewon0009/newslens-backend:latest
+    container_name: newslens-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/newslens?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
+      SPRING_DATASOURCE_USERNAME: newslens
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-newslens1234}
+      AI_ENGINE_URL: http://ai-engine:5000
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
+      YOUTUBE_AI_ANALYSIS_URL: http://youtube-ai:8000/analyze/youtube
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - newslens-network
+
+  frontend:
+    image: jaewon0009/newslens-frontend:latest
+    container_name: newslens-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - newslens-network
+
+  ai-engine:
+    image: jaewon0009/newslens-ai-engine:latest
+    container_name: newslens-ai-engine
+    environment:
+      FLASK_ENV: production
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      CHROMA_PERSIST_DIR: /app/chroma_db
+      SPRING_CALLBACK_URL: http://backend:8080/api/v1/internal/callback
+    ports:
+      - "5000:5000"
+    volumes:
+      - chroma-data:/app/chroma_db
+    networks:
+      - newslens-network
+
+  youtube-ai:
+    image: jaewon0009/newslens-youtube-ai:latest
+    container_name: newslens-youtube-ai
+    environment:
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    ports:
+      - "8000:8000"
+    networks:
+      - newslens-network
+
+volumes:
+  mysql-data:
+  chroma-data:
+
+networks:
+  newslens-network:
+    driver: bridge
