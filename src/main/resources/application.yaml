@@ -40,8 +40,12 @@ clova:
     api-url: https://XXXX.apigw.ntruss.com/custom/v1/XXXX/XXXX/general
     secret-key: your_clova_secret_key
 
+youtube:
+  api:
+    key: ${YOUTUBE_API_KEY:}
+
 ai:
   server:
     url: http://localhost:5000
   youtube:
-    analysis-url: ${YOUTUBE_AI_ANALYSIS_URL:http://localhost:8000}
+    analysis-url: ${YOUTUBE_AI_ANALYSIS_URL:http://localhost:8000/analyze/youtube}

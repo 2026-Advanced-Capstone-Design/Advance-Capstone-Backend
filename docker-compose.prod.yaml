@@ -29,6 +29,8 @@ services:
       SPRING_DATASOURCE_USERNAME: newslens
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-newslens1234}
       AI_ENGINE_URL: http://ai-engine:5000
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
+      YOUTUBE_AI_ANALYSIS_URL: http://youtube-ai:8000/analyze/youtube
     ports:
       - "8080:8080"
     depends_on:
@@ -59,6 +61,17 @@ services:
       - "5000:5000"
     volumes:
       - chroma-data:/app/chroma_db
+    networks:
+      - newslens-network
+
+  youtube-ai:
+    image: jaewon0009/newslens-youtube-ai:latest
+    container_name: newslens-youtube-ai
+    environment:
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    ports:
+      - "8000:8000"
     networks:
       - newslens-network
 
