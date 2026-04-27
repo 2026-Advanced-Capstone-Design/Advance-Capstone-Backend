@@ -1,6 +1,8 @@
 package com.factcheck.controller;
 
 import com.factcheck.common.response.ApiResponse;
+import com.factcheck.dto.request.TextRequest;
+import com.factcheck.dto.request.UrlRequest;
 import com.factcheck.dto.response.AnalyzeResponse;
 import com.factcheck.dto.response.AnalysisResultResponse;
 import com.factcheck.dto.response.AnalysisStatusResponse;
@@ -85,22 +87,4 @@ public class ArticleController {
         return ResponseEntity.ok(ApiResponse.ok(response, "분석 결과 조회 성공"));
     }
 
-    @Getter
-    @NoArgsConstructor
-    public static class TextRequest {
-        @NotBlank(message = "기사 본문을 입력해주세요.")
-        @Size(min = 50, max = 50000, message = "기사 본문은 50자 이상 50,000자 이하이어야 합니다.")
-        private String text;
-    }
-
-    @Getter
-    @NoArgsConstructor
-    public static class UrlRequest {
-        @NotBlank(message = "URL을 입력해주세요.")
-        @Pattern(
-            regexp = "^https?://[\\w\\-]+(\\.[\\w\\-]+)+(/[\\w\\-./?%&=]*)?$",
-            message = "올바른 URL 형식이 아닙니다. (http:// 또는 https://로 시작해야 합니다)"
-        )
-        private String url;
-    }
 }
