@@ -27,8 +27,9 @@ public class AiWorkerClient {
     }
 
     /**
-     * Flask /analyze 엔드포인트에 비동기로 분석 요청을 전송합니다.
-     * Article 상태를 ANALYZING → DONE / FAILED 로 갱신합니다.
+     * Flask /analyze 엔드포인트에 비동기로 분석 요청 전달
+     * aiWorkerExecutor 스레드풀에서 실행하라는 선언
+     * AI 분석 요청을 동시에 최대 8개까지 병렬 처리 가능
      */
     @Async("aiWorkerExecutor")
     @Transactional
@@ -43,6 +44,8 @@ public class AiWorkerClient {
                 .build();
 
         try {
+            // 파일 호출이 아닌 HTTP 요청을 호촐 HTTP 로 통신 하는 내장 메서드
+            // RestClient Config 참조
             AiAnalyzeResponse response = aiRestClient.post()
                     .uri("/analyze")
                     .body(request)

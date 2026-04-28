@@ -8,11 +8,6 @@ import com.factcheck.dto.response.AnalysisResultResponse;
 import com.factcheck.dto.response.AnalysisStatusResponse;
 import com.factcheck.service.ArticleService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -35,7 +30,7 @@ public class ArticleController {
     @PostMapping(value = "/analyze/text", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<AnalyzeResponse>> analyzeText(
             @Valid @RequestBody TextRequest request) {
-        AnalyzeResponse response = articleService.submitText(request.getText());
+        AnalyzeResponse response = articleService.submitText(request);
         return ResponseEntity.ok(ApiResponse.ok(response, "텍스트 분석 요청이 접수되었습니다."));
     }
 
@@ -48,7 +43,7 @@ public class ArticleController {
     @PostMapping(value = "/analyze/url", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<AnalyzeResponse>> analyzeUrl(
             @Valid @RequestBody UrlRequest request) {
-        AnalyzeResponse response = articleService.submitUrl(request.getUrl());
+        AnalyzeResponse response = articleService.submitUrl(request);
         return ResponseEntity.ok(ApiResponse.ok(response, "URL 분석 요청이 접수되었습니다."));
     }
 

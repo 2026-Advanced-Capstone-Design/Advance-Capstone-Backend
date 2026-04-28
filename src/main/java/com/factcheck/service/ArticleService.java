@@ -1,8 +1,9 @@
 package com.factcheck.service;
 
-import com.factcheck.Enum.InputType;
 import com.factcheck.domain.AnalysisCache;
 import com.factcheck.domain.Article;
+import com.factcheck.dto.request.TextRequest;
+import com.factcheck.dto.request.UrlRequest;
 import com.factcheck.dto.response.AnalyzeResponse;
 import com.factcheck.dto.response.AnalysisResultResponse;
 import com.factcheck.dto.response.AnalysisStatusResponse;
@@ -35,6 +36,7 @@ public class ArticleService {
     private final ArticleRepository articleRepository;
     private final AnalysisResultRepository analysisResultRepository;
     private final AnalysisCacheRepository analysisCacheRepository;
+
     private final CrawlerService crawlerService;
     private final OcrService ocrService;
     private final PreprocessService preprocessService;
@@ -42,21 +44,12 @@ public class ArticleService {
 
     private static final String IMAGE_UPLOAD_DIR = "uploads/images/";
 
-    /**
-     * 분석 상태 조회
-     * GET /api/v1/articles/{id}/status
-     */
     public AnalysisStatusResponse getStatus(Long articleId) {
         Article article = articleRepository.findById(articleId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ARTICLE_NOT_FOUND));
         return new AnalysisStatusResponse(article);
     }
 
-    /**
-     * 분석 결과 조회
-     * GET /api/v1/articles/{id}/result
-     * 명세 FR-09: analysis_results + sentence_analyses + source_references JOIN
-     */
     public AnalysisResultResponse getResult(Long articleId) {
         articleRepository.findById(articleId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ARTICLE_NOT_FOUND));
@@ -69,32 +62,22 @@ public class ArticleService {
     // ── 입력 타입별 처리 ──────────────────────────────────────────────
 
     @Transactional
-    public AnalyzeResponse submitText(String text) {
-        if (text == null || text.isBlank()) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT);
-        }
-
-        List<String> sentences = preprocessService.splitOnly(text);
+    public AnalyzeResponse submitText(TextRequest request) {
+        List<String> sentences = preprocessService.splitOnly(request.getText());
         String processed = String.join("\n", sentences);
-        log.info("텍스트 전처리 완료: 원문 {}자 → {}개 문장", text.length(), sentences.size());
+        log.info("텍스트 전처리 완료: 원문 {}자 → {}개 문장", request.getText().length(), sentences.size());
 
-        Article article = Article.builder()
-                .inputType(InputType.TEXT)
-                .originalText(processed)
-                .build();
+        Article article = request.toEntity(processed);
         articleRepository.save(article);
         aiWorkerClient.submitAnalysis(article);
         return new AnalyzeResponse(article);
     }
 
     @Transactional
-    public AnalyzeResponse submitUrl(String url) {
-        if (url == null || url.isBlank()) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT);
-        }
+    public AnalyzeResponse submitUrl(UrlRequest request) {
+        String url = request.getUrl();
         String urlHash = DigestUtils.md5DigestAsHex(url.getBytes());
 
-        // 만료되지 않은 캐시가 있으면 기존 article_id 반환
         return analysisCacheRepository.findByUrlHash(urlHash)
                 .filter(cache -> !cache.isExpired())
                 .map(cache -> {
@@ -102,7 +85,6 @@ public class ArticleService {
                     return new AnalyzeResponse(cache.getArticle());
                 })
                 .orElseGet(() -> {
-                    // URL 크롤링
                     Map<String, String> crawled = crawlerService.extractFromUrl(url);
                     String body = crawled.get("body");
                     String title = crawled.get("title");
@@ -116,12 +98,7 @@ public class ArticleService {
                         log.warn("URL 크롤링 결과 본문 없음: {}", url);
                     }
 
-                    Article article = Article.builder()
-                            .inputType(InputType.URL)
-                            .sourceUrl(url)
-                            .title(title)
-                            .originalText(processedText)
-                            .build();
+                    Article article = request.toEntity(title, processedText);
                     articleRepository.save(article);
 
                     analysisCacheRepository.save(AnalysisCache.builder()
@@ -141,7 +118,6 @@ public class ArticleService {
         }
         String imagePath = saveImage(image);
 
-        // OCR 텍스트 추출
         String ocrText = "";
         try {
             ocrText = ocrService.extractText(image);
@@ -156,11 +132,7 @@ public class ArticleService {
             log.error("OCR 처리 실패: {}", e.getMessage());
         }
 
-        Article article = Article.builder()
-                .inputType(InputType.IMAGE)
-                .imagePath(imagePath)
-                .originalText(ocrText)
-                .build();
+        Article article = Article.createFromImage(imagePath, ocrText);
         articleRepository.save(article);
         aiWorkerClient.submitAnalysis(article);
         return new AnalyzeResponse(article);
