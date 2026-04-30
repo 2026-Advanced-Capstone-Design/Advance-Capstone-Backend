@@ -16,8 +16,10 @@ WORKDIR /app
 
 COPY --from=build /app/build/libs/*.jar app.jar
 
-
-
+# Tesseract OCR 설치 (한국어 + 영어 학습 데이터 포함)
+RUN apt-get update && \
+    apt-get install -y tesseract-ocr tesseract-ocr-kor tesseract-ocr-eng && \
+    rm -rf /var/lib/apt/lists/*
 
 
 
