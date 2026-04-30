@@ -37,9 +37,16 @@ public class AnalysisResultResponse {
 
     private LocalDateTime analyzedAt;
 
+    private String originalText;
+
+    /** labeler.py 섹션별 편향 결과 (JSON string) */
+    private String sections;
+
     public AnalysisResultResponse(AnalysisResult result) {
-        this.articleId   = result.getArticle().getId();
-        this.resultId    = result.getId();
+        this.articleId    = result.getArticle().getId();
+        this.resultId     = result.getId();
+        this.originalText = result.getArticle().getOriginalText();
+        this.sections     = result.getSections();
         this.totalScore  = result.getTotalScore();
         this.indicators  = new Indicators(result);
         this.bias        = new BiasInfo(result);
@@ -65,13 +72,15 @@ public class AnalysisResultResponse {
         private Float emotionNeutrality;
         private Float factRatio;
         private Float sourceBalance;
+        private Float omissionNeutrality;
         private Float biasScore;
 
         public Indicators(AnalysisResult result) {
-            this.emotionNeutrality = result.getEmotionNeutrality();
-            this.factRatio         = result.getFactRatio();
-            this.sourceBalance     = result.getSourceBalance();
-            this.biasScore         = result.getBiasScore();
+            this.emotionNeutrality  = result.getEmotionNeutrality();
+            this.factRatio          = result.getFactRatio();
+            this.sourceBalance      = result.getSourceBalance();
+            this.omissionNeutrality = result.getOmissionNeutrality();
+            this.biasScore          = result.getBiasScore();
         }
     }
 

@@ -32,6 +32,9 @@ public class AnalysisResult {
     @Column(name = "source_balance")
     private Float sourceBalance;
 
+    @Column(name = "omission_neutrality")
+    private Float omissionNeutrality;
+
     @Column(name = "bias_score")
     private Float biasScore;
 
@@ -53,6 +56,10 @@ public class AnalysisResult {
     @Column(name = "bia_sentence", columnDefinition = "JSON")
     private String biaSentence;
 
+    // labeler.py 섹션별 편향 결과 [{topic, bias_label, confidence, reason}, ...]
+    @Column(name = "sections", columnDefinition = "JSON")
+    private String sections;
+
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ARTICLE_ID")
     private Article article;
@@ -65,19 +72,21 @@ public class AnalysisResult {
 
     @Builder
     public AnalysisResult(Integer totalScore, Float emotionNeutrality, Float factRatio,
-                          Float sourceBalance, Float biasScore, String biasDirection,
-                          String title, String summary, String spectrumLabel,
-                          String biaSentence, Article article) {
+                          Float sourceBalance, Float omissionNeutrality, Float biasScore,
+                          String biasDirection, String title, String summary, String spectrumLabel,
+                          String biaSentence, String sections, Article article) {
         this.totalScore = totalScore;
         this.emotionNeutrality = emotionNeutrality;
         this.factRatio = factRatio;
         this.sourceBalance = sourceBalance;
+        this.omissionNeutrality = omissionNeutrality;
         this.biasScore = biasScore;
         this.biasDirection = biasDirection;
         this.title = title;
         this.summary = summary;
         this.spectrumLabel = spectrumLabel;
         this.biaSentence = biaSentence;
+        this.sections = sections;
         this.article = article;
         this.analyzedAt = LocalDateTime.now();
     }

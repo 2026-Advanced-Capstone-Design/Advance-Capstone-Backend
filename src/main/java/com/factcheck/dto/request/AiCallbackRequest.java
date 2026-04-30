@@ -58,9 +58,47 @@ public class AiCallbackRequest {
     @JsonProperty("source_balance")
     private Double sourceBalance;
 
+    @JsonProperty("omission_neutrality")
+    private Double omissionNeutrality;
+
     @JsonProperty("bias_score")
     private Double biasScore;
 
     @JsonProperty("total_score")
     private Integer totalScore;
+
+    @JsonProperty("highlighted_sentences")
+    private List<HighlightedSentence> highlightedSentences;
+
+    @JsonProperty("sections")
+    private List<SectionResult> sections;
+
+    @Getter
+    @NoArgsConstructor
+    public static class SectionResult {
+        @JsonProperty("topic")
+        private String topic;          // 정치 | 경제 | 사회 | 국제 | 기타
+
+        @JsonProperty("bias_label")
+        private String biasLabel;      // progressive | conservative | neutral 등
+
+        @JsonProperty("confidence")
+        private Double confidence;
+
+        @JsonProperty("reason")
+        private String reason;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    public static class HighlightedSentence {
+        @JsonProperty("sentence")
+        private String sentence;
+
+        @JsonProperty("type")
+        private String type;   // vocab | framing | citation | omission
+
+        @JsonProperty("score")
+        private Double score;
+    }
 }

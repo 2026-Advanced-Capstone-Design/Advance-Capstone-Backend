@@ -42,3 +42,4 @@ out/
 .env
 .env.prod
 application-local.yaml
+youtube-ai-engine/

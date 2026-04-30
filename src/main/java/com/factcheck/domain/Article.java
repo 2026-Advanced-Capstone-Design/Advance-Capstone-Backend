@@ -55,6 +55,30 @@ public class Article {
         this.createdAt = LocalDateTime.now();
     }
 
+    public static Article createFromText(String processedText) {
+        return Article.builder()
+                .inputType(InputType.TEXT)
+                .originalText(processedText)
+                .build();
+    }
+
+    public static Article createFromUrl(String url, String title, String processedText) {
+        return Article.builder()
+                .inputType(InputType.URL)
+                .sourceUrl(url)
+                .title(title)
+                .originalText(processedText)
+                .build();
+    }
+
+    public static Article createFromImage(String imagePath, String ocrText) {
+        return Article.builder()
+                .inputType(InputType.IMAGE)
+                .imagePath(imagePath)
+                .originalText(ocrText)
+                .build();
+    }
+
     public void updateStatus(ArticleStatus status) {
         this.status = status;
     }

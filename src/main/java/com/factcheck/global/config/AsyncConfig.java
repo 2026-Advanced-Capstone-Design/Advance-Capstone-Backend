@@ -11,7 +11,10 @@ import java.util.concurrent.Executor;
 @EnableAsync
 
 public class AsyncConfig {
-
+/*
+     스레드풀: core 4개, max 8개, 대기큐 100개
+     최대 8개 까지의 동시 요청을 처리 하는것이 가능하다.
+ */
     @Bean(name = "aiWorkerExecutor")
     public Executor aiWorkerExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();

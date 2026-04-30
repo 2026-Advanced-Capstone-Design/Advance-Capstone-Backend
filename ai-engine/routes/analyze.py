@@ -9,6 +9,9 @@ from services.embedder import embed_and_store
 from services.analyzer import analyze as run_analysis
 from config import SPRING_CALLBACK_URL
 
+# 파이프 라인을 실행시켜주는 코드, 비동기적 처리이다. 
+# run pipeline을 통해서 실행한다.
+
 analyze_bp = Blueprint("analyze", __name__)
 
 
@@ -19,6 +22,7 @@ def _notify_spring(payload: dict):
     except Exception as e:
         print(f"[WARN] Spring 콜백 전송 실패: {e}")
 
+# 5단계의 전처리를 실행한다. 
 
 def _run_pipeline(task_id: str, article_id: int, text: str, input_type: str):
     """전처리 → 요약 → 임베딩 파이프라인 (별도 스레드에서 실행)"""
