@@ -80,7 +80,10 @@ public class YoutubeAnalysisService {
                 result.getNeutralPct(),
                 result.getBotCount(),
                 result.getBotPct(),
-                result.getSummary(),
+                result.getPositiveSummary(),
+                result.getNegativeSummary(),
+                result.getNeutralSummary(),
+                result.getSpecialNotes(),
                 parseComments(result.getCommentsJson())
         );
     }
