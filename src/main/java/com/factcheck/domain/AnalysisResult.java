@@ -32,6 +32,9 @@ public class AnalysisResult {
     @Column(name = "source_balance")
     private Float sourceBalance;
 
+    @Column(name = "omission_neutrality")
+    private Float omissionNeutrality;
+
     @Column(name = "bias_score")
     private Float biasScore;
 
@@ -69,13 +72,14 @@ public class AnalysisResult {
 
     @Builder
     public AnalysisResult(Integer totalScore, Float emotionNeutrality, Float factRatio,
-                          Float sourceBalance, Float biasScore, String biasDirection,
-                          String title, String summary, String spectrumLabel,
+                          Float sourceBalance, Float omissionNeutrality, Float biasScore,
+                          String biasDirection, String title, String summary, String spectrumLabel,
                           String biaSentence, String sections, Article article) {
         this.totalScore = totalScore;
         this.emotionNeutrality = emotionNeutrality;
         this.factRatio = factRatio;
         this.sourceBalance = sourceBalance;
+        this.omissionNeutrality = omissionNeutrality;
         this.biasScore = biasScore;
         this.biasDirection = biasDirection;
         this.title = title;

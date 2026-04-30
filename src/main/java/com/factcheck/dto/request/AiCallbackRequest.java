@@ -58,6 +58,9 @@ public class AiCallbackRequest {
     @JsonProperty("source_balance")
     private Double sourceBalance;
 
+    @JsonProperty("omission_neutrality")
+    private Double omissionNeutrality;
+
     @JsonProperty("bias_score")
     private Double biasScore;
 

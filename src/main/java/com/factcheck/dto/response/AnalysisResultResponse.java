@@ -72,13 +72,15 @@ public class AnalysisResultResponse {
         private Float emotionNeutrality;
         private Float factRatio;
         private Float sourceBalance;
+        private Float omissionNeutrality;
         private Float biasScore;
 
         public Indicators(AnalysisResult result) {
-            this.emotionNeutrality = result.getEmotionNeutrality();
-            this.factRatio         = result.getFactRatio();
-            this.sourceBalance     = result.getSourceBalance();
-            this.biasScore         = result.getBiasScore();
+            this.emotionNeutrality  = result.getEmotionNeutrality();
+            this.factRatio          = result.getFactRatio();
+            this.sourceBalance      = result.getSourceBalance();
+            this.omissionNeutrality = result.getOmissionNeutrality();
+            this.biasScore          = result.getBiasScore();
         }
     }
 

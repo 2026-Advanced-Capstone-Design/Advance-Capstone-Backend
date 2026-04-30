@@ -76,6 +76,7 @@ public class AnalysisCallbackService {
                 .emotionNeutrality(req.getEmotionNeutrality() != null ? req.getEmotionNeutrality().floatValue() : null)
                 .factRatio(req.getFactRatio() != null ? req.getFactRatio().floatValue() : null)
                 .sourceBalance(req.getSourceBalance() != null ? req.getSourceBalance().floatValue() : null)
+                .omissionNeutrality(req.getOmissionNeutrality() != null ? req.getOmissionNeutrality().floatValue() : null)
                 .biasScore(req.getBiasScore() != null ? req.getBiasScore().floatValue() : null)
                 .totalScore(req.getTotalScore())
                 .build();
