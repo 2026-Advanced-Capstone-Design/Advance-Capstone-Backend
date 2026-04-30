@@ -14,16 +14,18 @@ public class SentenceAnalysisResponse {
     private Float emotionScore;
     private Float biasScore;
     private Boolean isHighlighted;
-    private String highlightReason;
+    private String highlightReason;   // vocab | framing | citation | omission
+    private String highlightDetails;  // 강조된 단어
 
     public SentenceAnalysisResponse(SentenceAnalysis s) {
-        this.sentenceIndex = s.getSentenceIndex();
-        this.sentenceText = s.getSentenceText();
-        this.factOrOpinion = s.getFactOrOpinion();
-        this.factConfidence = s.getFactConfidence();
-        this.emotionScore = s.getEmotionScore();
-        this.biasScore = s.getBiasScore();
-        this.isHighlighted = s.getIsHighlighted();
-        this.highlightReason = s.getHighlightReason();
+        this.sentenceIndex    = s.getSentenceIndex();
+        this.sentenceText     = s.getSentenceText();
+        this.factOrOpinion    = s.getFactOrOpinion();
+        this.factConfidence   = s.getFactConfidence();
+        this.emotionScore     = s.getEmotionScore();
+        this.biasScore        = s.getBiasScore();
+        this.isHighlighted    = s.getIsHighlighted();
+        this.highlightReason  = s.getHighlightReason();
+        this.highlightDetails = s.getHighlight_details();
     }
 }

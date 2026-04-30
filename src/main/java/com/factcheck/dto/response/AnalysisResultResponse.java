@@ -37,9 +37,16 @@ public class AnalysisResultResponse {
 
     private LocalDateTime analyzedAt;
 
+    private String originalText;
+
+    /** labeler.py 섹션별 편향 결과 (JSON string) */
+    private String sections;
+
     public AnalysisResultResponse(AnalysisResult result) {
-        this.articleId   = result.getArticle().getId();
-        this.resultId    = result.getId();
+        this.articleId    = result.getArticle().getId();
+        this.resultId     = result.getId();
+        this.originalText = result.getArticle().getOriginalText();
+        this.sections     = result.getSections();
         this.totalScore  = result.getTotalScore();
         this.indicators  = new Indicators(result);
         this.bias        = new BiasInfo(result);
