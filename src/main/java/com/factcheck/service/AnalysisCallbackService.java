@@ -45,25 +45,10 @@ public class AnalysisCallbackService {
                 ? String.join(", ", req.getKeywords())
                 : "";
 
-        // 섹션별 편향 결과 → JSON 문자열
-        String sectionsJson;
-        try {
-            sectionsJson = req.getSections() != null
-                    ? objectMapper.writeValueAsString(req.getSections())
-                    : "[]";
-        } catch (JsonProcessingException e) {
-            sectionsJson = "[]";
-        }
-
-        // 핵심 사실 → summary에 함께 보관
-        String keyFactsJson;
-        try {
-            keyFactsJson = req.getKeyFacts() != null
-                    ? objectMapper.writeValueAsString(req.getKeyFacts())
-                    : "[]";
-        } catch (JsonProcessingException e) {
-            keyFactsJson = "[]";
-        }
+        String sectionsJson       = toJson(req.getSections());
+        String keyFactsJson       = toJson(req.getKeyFacts());
+        String sourcesJson        = toJson(req.getSources());
+        String factcheckJson      = toJson(req.getFactcheckResults());
 
         AnalysisResult result = AnalysisResult.builder()
                 .article(article)
@@ -71,6 +56,15 @@ public class AnalysisCallbackService {
                 .title(req.getTopic())
                 .biaSentence(keyFactsJson)
                 .sections(sectionsJson)
+                .sources(sourcesJson)
+                .factRatioSource(req.getFactRatioSource())
+                .factcheckResults(factcheckJson)
+                .sectionBiasScore(req.getSectionBiasScore() != null ? req.getSectionBiasScore().floatValue() : null)
+                .background(req.getBackground())
+                .cotVocabReason(req.getCotVocabReason())
+                .cotFramingReason(req.getCotFramingReason())
+                .cotCitationReason(req.getCotCitationReason())
+                .cotOmissionReason(req.getCotOmissionReason())
                 .biasDirection(req.getBiasDirection())
                 .spectrumLabel(req.getSpectrumLabel())
                 .emotionNeutrality(req.getEmotionNeutrality() != null ? req.getEmotionNeutrality().floatValue() : null)
@@ -107,5 +101,14 @@ public class AnalysisCallbackService {
                 req.getArticleId(),
                 highlights != null ? highlights.size() : 0,
                 keywordsStr);
+    }
+
+    private String toJson(Object value) {
+        if (value == null) return "[]";
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            return "[]";
+        }
     }
 }

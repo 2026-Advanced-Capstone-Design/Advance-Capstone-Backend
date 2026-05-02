@@ -56,9 +56,35 @@ public class AnalysisResult {
     @Column(name = "bia_sentence", columnDefinition = "JSON")
     private String biaSentence;
 
-    // labeler.py 섹션별 편향 결과 [{topic, bias_label, confidence, reason}, ...]
     @Column(name = "sections", columnDefinition = "JSON")
     private String sections;
+
+    @Column(name = "sources", columnDefinition = "JSON")
+    private String sources;
+
+    @Column(name = "fact_ratio_source", length = 10)
+    private String factRatioSource;
+
+    @Column(name = "factcheck_results", columnDefinition = "JSON")
+    private String factcheckResults;
+
+    @Column(name = "section_bias_score")
+    private Float sectionBiasScore;
+
+    @Column(name = "background", columnDefinition = "TEXT")
+    private String background;
+
+    @Column(name = "cot_vocab_reason", columnDefinition = "TEXT")
+    private String cotVocabReason;
+
+    @Column(name = "cot_framing_reason", columnDefinition = "TEXT")
+    private String cotFramingReason;
+
+    @Column(name = "cot_citation_reason", columnDefinition = "TEXT")
+    private String cotCitationReason;
+
+    @Column(name = "cot_omission_reason", columnDefinition = "TEXT")
+    private String cotOmissionReason;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ARTICLE_ID")
@@ -74,7 +100,10 @@ public class AnalysisResult {
     public AnalysisResult(Integer totalScore, Float emotionNeutrality, Float factRatio,
                           Float sourceBalance, Float omissionNeutrality, Float biasScore,
                           String biasDirection, String title, String summary, String spectrumLabel,
-                          String biaSentence, String sections, Article article) {
+                          String biaSentence, String sections, String sources,
+                          String factRatioSource, String factcheckResults, Float sectionBiasScore,
+                          String background, String cotVocabReason, String cotFramingReason,
+                          String cotCitationReason, String cotOmissionReason, Article article) {
         this.totalScore = totalScore;
         this.emotionNeutrality = emotionNeutrality;
         this.factRatio = factRatio;
@@ -87,6 +116,15 @@ public class AnalysisResult {
         this.spectrumLabel = spectrumLabel;
         this.biaSentence = biaSentence;
         this.sections = sections;
+        this.sources = sources;
+        this.factRatioSource = factRatioSource;
+        this.factcheckResults = factcheckResults;
+        this.sectionBiasScore = sectionBiasScore;
+        this.background = background;
+        this.cotVocabReason = cotVocabReason;
+        this.cotFramingReason = cotFramingReason;
+        this.cotCitationReason = cotCitationReason;
+        this.cotOmissionReason = cotOmissionReason;
         this.article = article;
         this.analyzedAt = LocalDateTime.now();
     }

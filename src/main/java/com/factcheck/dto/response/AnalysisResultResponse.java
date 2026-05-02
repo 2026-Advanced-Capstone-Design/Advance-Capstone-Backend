@@ -38,24 +38,34 @@ public class AnalysisResultResponse {
     private LocalDateTime analyzedAt;
 
     private String originalText;
-
-    /** labeler.py 섹션별 편향 결과 (JSON string) */
     private String sections;
+    private String articleSources;
+    private String factcheckResults;
+    private String factRatioSource;
+    private Float  sectionBiasScore;
+    private String background;
+    private CotReasons cotReasons;
 
     public AnalysisResultResponse(AnalysisResult result) {
-        this.articleId    = result.getArticle().getId();
-        this.resultId     = result.getId();
-        this.originalText = result.getArticle().getOriginalText();
-        this.sections     = result.getSections();
-        this.totalScore  = result.getTotalScore();
-        this.indicators  = new Indicators(result);
-        this.bias        = new BiasInfo(result);
-        this.summary     = new SummaryInfo(result);
-        this.analyzedAt  = result.getAnalyzedAt();
-        this.sentences   = result.getSentenceAnalyses().stream()
+        this.articleId       = result.getArticle().getId();
+        this.resultId        = result.getId();
+        this.originalText    = result.getArticle().getOriginalText();
+        this.sections        = result.getSections();
+        this.articleSources  = result.getSources();
+        this.factcheckResults = result.getFactcheckResults();
+        this.factRatioSource = result.getFactRatioSource();
+        this.sectionBiasScore = result.getSectionBiasScore();
+        this.background      = result.getBackground();
+        this.cotReasons      = new CotReasons(result);
+        this.totalScore      = result.getTotalScore();
+        this.indicators      = new Indicators(result);
+        this.bias            = new BiasInfo(result);
+        this.summary         = new SummaryInfo(result);
+        this.analyzedAt      = result.getAnalyzedAt();
+        this.sentences       = result.getSentenceAnalyses().stream()
                 .map(SentenceAnalysisResponse::new)
                 .collect(Collectors.toList());
-        this.sources     = result.getSourceReferences().stream()
+        this.sources         = result.getSourceReferences().stream()
                 .map(SourceReferenceResponse::new)
                 .collect(Collectors.toList());
     }
@@ -107,6 +117,22 @@ public class AnalysisResultResponse {
         public SummaryInfo(AnalysisResult result) {
             this.title   = result.getTitle();
             this.content = result.getSummary();
+        }
+    }
+
+    /** CoT 4단계 근거 텍스트 */
+    @Getter
+    public static class CotReasons {
+        private String vocab;
+        private String framing;
+        private String citation;
+        private String omission;
+
+        public CotReasons(AnalysisResult result) {
+            this.vocab    = result.getCotVocabReason();
+            this.framing  = result.getCotFramingReason();
+            this.citation = result.getCotCitationReason();
+            this.omission = result.getCotOmissionReason();
         }
     }
 }

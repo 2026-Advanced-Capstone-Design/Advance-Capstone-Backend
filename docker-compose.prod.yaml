@@ -7,14 +7,14 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root1234}
       MYSQL_DATABASE: newslens
-      MYSQL_USER: newslens
+      MYSQL_USER: newslensd
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-newslens1234}
       TZ: Asia/Seoul
     volumes:
       - mysql-data:/var/lib/mysql
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["C3MD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
