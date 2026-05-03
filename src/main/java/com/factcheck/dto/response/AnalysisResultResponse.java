@@ -32,15 +32,11 @@ public class AnalysisResultResponse {
     /** 문장별 하이라이트 목록 (FR-09: 문장별 하이라이트) */
     private List<SentenceAnalysisResponse> sentences;
 
-    /** 출처 목록 (FR-08: 매칭된 출처 목록 + 일치 여부) */
-    private List<SourceReferenceResponse> sources;
-
     private LocalDateTime analyzedAt;
 
     private String originalText;
     private String sections;
     private String articleSources;
-    private String factcheckResults;
     private String factRatioSource;
     private Float  sectionBiasScore;
     private String background;
@@ -52,7 +48,6 @@ public class AnalysisResultResponse {
         this.originalText    = result.getArticle().getOriginalText();
         this.sections        = result.getSections();
         this.articleSources  = result.getSources();
-        this.factcheckResults = result.getFactcheckResults();
         this.factRatioSource = result.getFactRatioSource();
         this.sectionBiasScore = result.getSectionBiasScore();
         this.background      = result.getBackground();
@@ -64,9 +59,6 @@ public class AnalysisResultResponse {
         this.analyzedAt      = result.getAnalyzedAt();
         this.sentences       = result.getSentenceAnalyses().stream()
                 .map(SentenceAnalysisResponse::new)
-                .collect(Collectors.toList());
-        this.sources         = result.getSourceReferences().stream()
-                .map(SourceReferenceResponse::new)
                 .collect(Collectors.toList());
     }
 
@@ -94,29 +86,37 @@ public class AnalysisResultResponse {
         }
     }
 
-    /** 편향 방향 + 스펙트럼 분류 */
+    /** 편향 방향 + 스펙트럼 분류 + 라벨링 결과 */
     @Getter
     public static class BiasInfo {
         private String biasDirection;
         private String spectrumLabel;
-        private String biaSentence;   // 편향 문장 목록 (JSON string)
+        private String biasLabel;
+        private Float  biasConfidence;
+        private String biasReason;
 
         public BiasInfo(AnalysisResult result) {
-            this.biasDirection = result.getBiasDirection();
-            this.spectrumLabel = result.getSpectrumLabel();
-            this.biaSentence   = result.getBiaSentence();
+            this.biasDirection  = result.getBiasDirection();
+            this.spectrumLabel  = result.getSpectrumLabel();
+            this.biasLabel      = result.getBiasLabel();
+            this.biasConfidence = result.getBiasConfidence();
+            this.biasReason     = result.getBiasReason();
         }
     }
 
-    /** AI가 추출한 제목 + 요약 */
+    /** AI가 추출한 제목 + 요약 + 핵심 사실 + 키워드 */
     @Getter
     public static class SummaryInfo {
         private String title;
         private String content;
+        private String keyFacts;
+        private String keywords;
 
         public SummaryInfo(AnalysisResult result) {
-            this.title   = result.getTitle();
-            this.content = result.getSummary();
+            this.title    = result.getTitle();
+            this.content  = result.getSummary();
+            this.keyFacts = result.getKeyFacts();
+            this.keywords = result.getKeywords();
         }
     }
 

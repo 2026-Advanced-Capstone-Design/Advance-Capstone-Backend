@@ -97,9 +97,6 @@ public class AiCallbackRequest {
     @JsonProperty("sections")
     private List<SectionResult> sections;
 
-    @JsonProperty("factcheck_results")
-    private List<FactCheckResult> factcheckResults;
-
     // ── 섹션별 편향 (CoT 3단계 포함) ──────────────────────────────────────
     @Getter
     @NoArgsConstructor
@@ -140,29 +137,4 @@ public class AiCallbackRequest {
         private Double score;
     }
 
-    // ── Google Fact Check 결과 ────────────────────────────────────────────
-    @Getter
-    @NoArgsConstructor
-    public static class FactCheckResult {
-        @JsonProperty("fact")
-        private String fact;
-
-        @JsonProperty("found")
-        private Boolean found;
-
-        @JsonProperty("rating")
-        private String rating;
-
-        @JsonProperty("score")
-        private Double score;
-
-        @JsonProperty("publisher")
-        private String publisher;
-
-        @JsonProperty("url")
-        private String url;
-
-        @JsonProperty("error")
-        private String error;
-    }
 }

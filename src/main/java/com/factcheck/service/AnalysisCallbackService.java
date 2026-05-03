@@ -29,6 +29,14 @@ public class AnalysisCallbackService {
     private final SentenceAnalysisRepository sentenceAnalysisRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /*
+        Article을 정의 한 다음에
+        1. Article을 조회하고
+        2. JSON을 직렬화 한다.
+        3.AnalysisResult 저장\
+        4. SentenceAnalysis 저장
+        5. 완료처리
+     */
     @Transactional
     public void handleCallback(AiCallbackRequest req) {
         Article article = articleRepository.findById(req.getArticleId())
@@ -40,25 +48,24 @@ public class AnalysisCallbackService {
             return;
         }
 
-        // 키워드 리스트 → 쉼표 구분 문자열
         String keywordsStr = req.getKeywords() != null
                 ? String.join(", ", req.getKeywords())
                 : "";
 
-        String sectionsJson       = toJson(req.getSections());
-        String keyFactsJson       = toJson(req.getKeyFacts());
-        String sourcesJson        = toJson(req.getSources());
-        String factcheckJson      = toJson(req.getFactcheckResults());
+        String sectionsJson  = toJson(req.getSections());
+        String keyFactsJson  = toJson(req.getKeyFacts());
+        String keywordsJson  = toJson(req.getKeywords());
+        String sourcesJson   = toJson(req.getSources());
 
         AnalysisResult result = AnalysisResult.builder()
                 .article(article)
                 .summary(req.getOneLineSummary())
                 .title(req.getTopic())
-                .biaSentence(keyFactsJson)
+                .keyFacts(keyFactsJson)
+                .keywords(keywordsJson)
                 .sections(sectionsJson)
                 .sources(sourcesJson)
                 .factRatioSource(req.getFactRatioSource())
-                .factcheckResults(factcheckJson)
                 .sectionBiasScore(req.getSectionBiasScore() != null ? req.getSectionBiasScore().floatValue() : null)
                 .background(req.getBackground())
                 .cotVocabReason(req.getCotVocabReason())
@@ -66,6 +73,9 @@ public class AnalysisCallbackService {
                 .cotCitationReason(req.getCotCitationReason())
                 .cotOmissionReason(req.getCotOmissionReason())
                 .biasDirection(req.getBiasDirection())
+                .biasLabel(req.getBiasLabel())
+                .biasConfidence(req.getBiasConfidence() != null ? req.getBiasConfidence().floatValue() : null)
+                .biasReason(req.getBiasReason())
                 .spectrumLabel(req.getSpectrumLabel())
                 .emotionNeutrality(req.getEmotionNeutrality() != null ? req.getEmotionNeutrality().floatValue() : null)
                 .factRatio(req.getFactRatio() != null ? req.getFactRatio().floatValue() : null)
@@ -77,7 +87,6 @@ public class AnalysisCallbackService {
 
         analysisResultRepository.save(result);
 
-        // highlighted_sentences → sentence_analyses 저장
         List<AiCallbackRequest.HighlightedSentence> highlights = req.getHighlightedSentences();
         if (highlights != null && !highlights.isEmpty()) {
             for (int i = 0; i < highlights.size(); i++) {

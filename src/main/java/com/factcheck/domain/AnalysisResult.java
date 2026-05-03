@@ -41,6 +41,15 @@ public class AnalysisResult {
     @Column(name = "bias_direction", length = 20)
     private String biasDirection;
 
+    @Column(name = "bias_label", length = 30)
+    private String biasLabel;
+
+    @Column(name = "bias_confidence")
+    private Float biasConfidence;
+
+    @Column(name = "bias_reason", columnDefinition = "TEXT")
+    private String biasReason;
+
     @Column(name = "title", columnDefinition = "TEXT")
     private String title;
 
@@ -54,7 +63,10 @@ public class AnalysisResult {
     private LocalDateTime analyzedAt;
 
     @Column(name = "bia_sentence", columnDefinition = "JSON")
-    private String biaSentence;
+    private String keyFacts;
+
+    @Column(name = "keywords", columnDefinition = "JSON")
+    private String keywords;
 
     @Column(name = "sections", columnDefinition = "JSON")
     private String sections;
@@ -64,9 +76,6 @@ public class AnalysisResult {
 
     @Column(name = "fact_ratio_source", length = 10)
     private String factRatioSource;
-
-    @Column(name = "factcheck_results", columnDefinition = "JSON")
-    private String factcheckResults;
 
     @Column(name = "section_bias_score")
     private Float sectionBiasScore;
@@ -99,9 +108,10 @@ public class AnalysisResult {
     @Builder
     public AnalysisResult(Integer totalScore, Float emotionNeutrality, Float factRatio,
                           Float sourceBalance, Float omissionNeutrality, Float biasScore,
-                          String biasDirection, String title, String summary, String spectrumLabel,
-                          String biaSentence, String sections, String sources,
-                          String factRatioSource, String factcheckResults, Float sectionBiasScore,
+                          String biasDirection, String biasLabel, Float biasConfidence, String biasReason,
+                          String title, String summary, String spectrumLabel,
+                          String keyFacts, String keywords, String sections, String sources,
+                          String factRatioSource, Float sectionBiasScore,
                           String background, String cotVocabReason, String cotFramingReason,
                           String cotCitationReason, String cotOmissionReason, Article article) {
         this.totalScore = totalScore;
@@ -110,15 +120,18 @@ public class AnalysisResult {
         this.sourceBalance = sourceBalance;
         this.omissionNeutrality = omissionNeutrality;
         this.biasScore = biasScore;
-        this.biasDirection = biasDirection;
+        this.biasDirection  = biasDirection;
+        this.biasLabel      = biasLabel;
+        this.biasConfidence = biasConfidence;
+        this.biasReason     = biasReason;
         this.title = title;
         this.summary = summary;
         this.spectrumLabel = spectrumLabel;
-        this.biaSentence = biaSentence;
+        this.keyFacts  = keyFacts;
+        this.keywords  = keywords;
         this.sections = sections;
         this.sources = sources;
         this.factRatioSource = factRatioSource;
-        this.factcheckResults = factcheckResults;
         this.sectionBiasScore = sectionBiasScore;
         this.background = background;
         this.cotVocabReason = cotVocabReason;
