@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Flask AI 엔진이 호출하는 내부 전용 API.
- * 외부에서는 호출하지 않습니다.
+ * 외부에서는 호출하지 않음.
  */
 @RestController
 @RequestMapping("/api/v1/internal")
