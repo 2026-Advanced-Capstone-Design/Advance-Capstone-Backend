@@ -14,7 +14,7 @@ public class AiCallbackRequest {
     private Long articleId;
 
     @JsonProperty("status")
-    private String status;          // "DONE" or "FAILED"
+    private String status;
 
     @JsonProperty("error")
     private String error;
@@ -33,6 +33,9 @@ public class AiCallbackRequest {
 
     @JsonProperty("sentence_count")
     private Integer sentenceCount;
+
+    @JsonProperty("sources")
+    private List<String> sources;
 
     @JsonProperty("bias_label")
     private String biasLabel;
@@ -55,6 +58,9 @@ public class AiCallbackRequest {
     @JsonProperty("fact_ratio")
     private Double factRatio;
 
+    @JsonProperty("fact_ratio_source")
+    private String factRatioSource;
+
     @JsonProperty("source_balance")
     private Double sourceBalance;
 
@@ -64,8 +70,26 @@ public class AiCallbackRequest {
     @JsonProperty("bias_score")
     private Double biasScore;
 
+    @JsonProperty("section_bias_score")
+    private Double sectionBiasScore;
+
     @JsonProperty("total_score")
     private Integer totalScore;
+
+    @JsonProperty("background")
+    private String background;
+
+    @JsonProperty("cot_vocab_reason")
+    private String cotVocabReason;
+
+    @JsonProperty("cot_framing_reason")
+    private String cotFramingReason;
+
+    @JsonProperty("cot_citation_reason")
+    private String cotCitationReason;
+
+    @JsonProperty("cot_omission_reason")
+    private String cotOmissionReason;
 
     @JsonProperty("highlighted_sentences")
     private List<HighlightedSentence> highlightedSentences;
@@ -73,14 +97,24 @@ public class AiCallbackRequest {
     @JsonProperty("sections")
     private List<SectionResult> sections;
 
+    // ── 섹션별 편향 (CoT 3단계 포함) ──────────────────────────────────────
     @Getter
     @NoArgsConstructor
     public static class SectionResult {
         @JsonProperty("topic")
-        private String topic;          // 정치 | 경제 | 사회 | 국제 | 기타
+        private String topic;
+
+        @JsonProperty("step1_biased_expressions")
+        private List<String> step1BiasedExpressions;
+
+        @JsonProperty("step2_neutral_expressions")
+        private List<String> step2NeutralExpressions;
+
+        @JsonProperty("step3_judgment")
+        private String step3Judgment;
 
         @JsonProperty("bias_label")
-        private String biasLabel;      // progressive | conservative | neutral 등
+        private String biasLabel;
 
         @JsonProperty("confidence")
         private Double confidence;
@@ -89,6 +123,7 @@ public class AiCallbackRequest {
         private String reason;
     }
 
+    // ── 하이라이팅 문장 ────────────────────────────────────────────────────
     @Getter
     @NoArgsConstructor
     public static class HighlightedSentence {
@@ -96,9 +131,10 @@ public class AiCallbackRequest {
         private String sentence;
 
         @JsonProperty("type")
-        private String type;   // vocab | framing | citation | omission
+        private String type;
 
         @JsonProperty("score")
         private Double score;
     }
+
 }

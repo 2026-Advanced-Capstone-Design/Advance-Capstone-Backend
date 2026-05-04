@@ -28,9 +28,9 @@ public class ArticleController {
      * Body: { "text": "기사 본문..." }
      */
     @PostMapping(value = "/analyze/text", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ApiResponse<AnalyzeResponse>> analyzeText(
-            @Valid @RequestBody TextRequest request) {
-        AnalyzeResponse response = articleService.submitText(request);
+        public ResponseEntity<ApiResponse<AnalyzeResponse>> analyzeText(
+                @Valid @RequestBody TextRequest request) {
+            AnalyzeResponse response = articleService.submitText(request);
         return ResponseEntity.ok(ApiResponse.ok(response, "텍스트 분석 요청이 접수되었습니다."));
     }
 

@@ -4,12 +4,14 @@ import com.factcheck.Enum.ArticleStatus;
 import com.factcheck.domain.AnalysisResult;
 import com.factcheck.domain.Article;
 import com.factcheck.domain.SentenceAnalysis;
+import com.factcheck.domain.SourceReference;
 import com.factcheck.dto.request.AiCallbackRequest;
 import com.factcheck.global.exception.BusinessException;
 import com.factcheck.global.exception.ErrorCode;
 import com.factcheck.repository.AnalysisResultRepository;
 import com.factcheck.repository.ArticleRepository;
 import com.factcheck.repository.SentenceAnalysisRepository;
+import com.factcheck.repository.SourceReferenceRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -27,8 +29,17 @@ public class AnalysisCallbackService {
     private final ArticleRepository articleRepository;
     private final AnalysisResultRepository analysisResultRepository;
     private final SentenceAnalysisRepository sentenceAnalysisRepository;
+    private final SourceReferenceRepository sourceReferenceRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /*
+        Article을 정의 한 다음에
+        1. Article을 조회하고
+        2. JSON을 직렬화 한다.
+        3.AnalysisResult 저장\
+        4. SentenceAnalysis 저장
+        5. 완료처리
+     */
     @Transactional
     public void handleCallback(AiCallbackRequest req) {
         Article article = articleRepository.findById(req.getArticleId())
@@ -40,38 +51,39 @@ public class AnalysisCallbackService {
             return;
         }
 
-        // 키워드 리스트 → 쉼표 구분 문자열
+        if (analysisResultRepository.findByArticleId(req.getArticleId()).isPresent()) {
+            log.warn("중복 콜백 무시: articleId={}", req.getArticleId());
+            return;
+        }
+
         String keywordsStr = req.getKeywords() != null
                 ? String.join(", ", req.getKeywords())
                 : "";
 
-        // 섹션별 편향 결과 → JSON 문자열
-        String sectionsJson;
-        try {
-            sectionsJson = req.getSections() != null
-                    ? objectMapper.writeValueAsString(req.getSections())
-                    : "[]";
-        } catch (JsonProcessingException e) {
-            sectionsJson = "[]";
-        }
-
-        // 핵심 사실 → summary에 함께 보관
-        String keyFactsJson;
-        try {
-            keyFactsJson = req.getKeyFacts() != null
-                    ? objectMapper.writeValueAsString(req.getKeyFacts())
-                    : "[]";
-        } catch (JsonProcessingException e) {
-            keyFactsJson = "[]";
-        }
+        String sectionsJson  = toJson(req.getSections());
+        String keyFactsJson  = toJson(req.getKeyFacts());
+        String keywordsJson  = toJson(req.getKeywords());
+        String sourcesJson   = toJson(req.getSources());
 
         AnalysisResult result = AnalysisResult.builder()
                 .article(article)
                 .summary(req.getOneLineSummary())
                 .title(req.getTopic())
-                .biaSentence(keyFactsJson)
+                .keyFacts(keyFactsJson)
+                .keywords(keywordsJson)
                 .sections(sectionsJson)
+                .sources(sourcesJson)
+                .factRatioSource(req.getFactRatioSource())
+                .sectionBiasScore(req.getSectionBiasScore() != null ? req.getSectionBiasScore().floatValue() : null)
+                .background(req.getBackground())
+                .cotVocabReason(req.getCotVocabReason())
+                .cotFramingReason(req.getCotFramingReason())
+                .cotCitationReason(req.getCotCitationReason())
+                .cotOmissionReason(req.getCotOmissionReason())
                 .biasDirection(req.getBiasDirection())
+                .biasLabel(req.getBiasLabel())
+                .biasConfidence(req.getBiasConfidence() != null ? req.getBiasConfidence().floatValue() : null)
+                .biasReason(req.getBiasReason())
                 .spectrumLabel(req.getSpectrumLabel())
                 .emotionNeutrality(req.getEmotionNeutrality() != null ? req.getEmotionNeutrality().floatValue() : null)
                 .factRatio(req.getFactRatio() != null ? req.getFactRatio().floatValue() : null)
@@ -83,7 +95,6 @@ public class AnalysisCallbackService {
 
         analysisResultRepository.save(result);
 
-        // highlighted_sentences → sentence_analyses 저장
         List<AiCallbackRequest.HighlightedSentence> highlights = req.getHighlightedSentences();
         if (highlights != null && !highlights.isEmpty()) {
             for (int i = 0; i < highlights.size(); i++) {
@@ -101,11 +112,33 @@ public class AnalysisCallbackService {
             }
         }
 
+        List<String> sources = req.getSources();
+        if (sources != null && !sources.isEmpty()) {
+            for (String sourceName : sources) {
+                SourceReference ref = SourceReference.builder()
+                        .sourceName(sourceName)
+                        .analysisResult(result)
+                        .article(article)
+                        .build();
+                sourceReferenceRepository.save(ref);
+            }
+        }
+
         article.updateStatus(ArticleStatus.DONE);
 
-        log.info("AI 분석 완료 저장: articleId={}, highlights={}건, keywords=[{}]",
+        log.info("AI 분석 완료 저장: articleId={}, highlights={}건, sources={}건, keywords=[{}]",
                 req.getArticleId(),
                 highlights != null ? highlights.size() : 0,
+                sources != null ? sources.size() : 0,
                 keywordsStr);
+    }
+
+    private String toJson(Object value) {
+        if (value == null) return "[]";
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            return "[]";
+        }
     }
 }

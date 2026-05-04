@@ -7,7 +7,7 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root1234}
       MYSQL_DATABASE: newslens
-      MYSQL_USER: newslens
+      MYSQL_USER: newslensd
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-newslens1234}
       TZ: Asia/Seoul
     volumes:

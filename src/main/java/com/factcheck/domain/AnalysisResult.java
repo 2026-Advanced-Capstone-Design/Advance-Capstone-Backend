@@ -41,6 +41,15 @@ public class AnalysisResult {
     @Column(name = "bias_direction", length = 20)
     private String biasDirection;
 
+    @Column(name = "bias_label", length = 30)
+    private String biasLabel;
+
+    @Column(name = "bias_confidence")
+    private Float biasConfidence;
+
+    @Column(name = "bias_reason", columnDefinition = "TEXT")
+    private String biasReason;
+
     @Column(name = "title", columnDefinition = "TEXT")
     private String title;
 
@@ -53,15 +62,41 @@ public class AnalysisResult {
     @Column(name = "analyzed_at")
     private LocalDateTime analyzedAt;
 
-    @Column(name = "bia_sentence", columnDefinition = "JSON")
-    private String biaSentence;
+    @Column(name = "key_facts", columnDefinition = "JSON")
+    private String keyFacts;
 
-    // labeler.py 섹션별 편향 결과 [{topic, bias_label, confidence, reason}, ...]
+    @Column(name = "keywords", columnDefinition = "JSON")
+    private String keywords;
+
     @Column(name = "sections", columnDefinition = "JSON")
     private String sections;
 
+    @Column(name = "sources", columnDefinition = "JSON")
+    private String sources;
+
+    @Column(name = "fact_ratio_source", length = 10)
+    private String factRatioSource;
+
+    @Column(name = "section_bias_score")
+    private Float sectionBiasScore;
+
+    @Column(name = "background", columnDefinition = "TEXT")
+    private String background;
+
+    @Column(name = "cot_vocab_reason", columnDefinition = "TEXT")
+    private String cotVocabReason;
+
+    @Column(name = "cot_framing_reason", columnDefinition = "TEXT")
+    private String cotFramingReason;
+
+    @Column(name = "cot_citation_reason", columnDefinition = "TEXT")
+    private String cotCitationReason;
+
+    @Column(name = "cot_omission_reason", columnDefinition = "TEXT")
+    private String cotOmissionReason;
+
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ARTICLE_ID")
+    @JoinColumn(name = "ARTICLE_ID", unique = true)
     private Article article;
 
     @OneToMany(mappedBy = "analysisResult", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -73,20 +108,36 @@ public class AnalysisResult {
     @Builder
     public AnalysisResult(Integer totalScore, Float emotionNeutrality, Float factRatio,
                           Float sourceBalance, Float omissionNeutrality, Float biasScore,
-                          String biasDirection, String title, String summary, String spectrumLabel,
-                          String biaSentence, String sections, Article article) {
+                          String biasDirection, String biasLabel, Float biasConfidence, String biasReason,
+                          String title, String summary, String spectrumLabel,
+                          String keyFacts, String keywords, String sections, String sources,
+                          String factRatioSource, Float sectionBiasScore,
+                          String background, String cotVocabReason, String cotFramingReason,
+                          String cotCitationReason, String cotOmissionReason, Article article) {
         this.totalScore = totalScore;
         this.emotionNeutrality = emotionNeutrality;
         this.factRatio = factRatio;
         this.sourceBalance = sourceBalance;
         this.omissionNeutrality = omissionNeutrality;
         this.biasScore = biasScore;
-        this.biasDirection = biasDirection;
+        this.biasDirection  = biasDirection;
+        this.biasLabel      = biasLabel;
+        this.biasConfidence = biasConfidence;
+        this.biasReason     = biasReason;
         this.title = title;
         this.summary = summary;
         this.spectrumLabel = spectrumLabel;
-        this.biaSentence = biaSentence;
+        this.keyFacts  = keyFacts;
+        this.keywords  = keywords;
         this.sections = sections;
+        this.sources = sources;
+        this.factRatioSource = factRatioSource;
+        this.sectionBiasScore = sectionBiasScore;
+        this.background = background;
+        this.cotVocabReason = cotVocabReason;
+        this.cotFramingReason = cotFramingReason;
+        this.cotCitationReason = cotCitationReason;
+        this.cotOmissionReason = cotOmissionReason;
         this.article = article;
         this.analyzedAt = LocalDateTime.now();
     }

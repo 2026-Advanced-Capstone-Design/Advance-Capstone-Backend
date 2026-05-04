@@ -1,72 +1,95 @@
 package com.factcheck.dto.response;
 
 import com.factcheck.domain.AnalysisResult;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
  * GET /api/v1/articles/{id}/result 응답 DTO
- * 명세 FR-09: 종합 결과 JSON (신뢰도, 4대 지표, 편향, 요약, 문장별 하이라이트, 출처)
  */
 @Getter
 public class AnalysisResultResponse {
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     private Long articleId;
     private Long resultId;
-
-    /** 신뢰도 종합 점수 (0~100) */
     private Integer totalScore;
-
-    /** 4대 지표 */
     private Indicators indicators;
-
-    /** 편향 분석 */
     private BiasInfo bias;
-
-    /** 요약 정보 */
     private SummaryInfo summary;
-
-    /** 문장별 하이라이트 목록 (FR-09: 문장별 하이라이트) */
+    private List<SectionInfo> sections;
     private List<SentenceAnalysisResponse> sentences;
-
-    /** 출처 목록 (FR-08: 매칭된 출처 목록 + 일치 여부) */
-    private List<SourceReferenceResponse> sources;
-
     private LocalDateTime analyzedAt;
-
     private String originalText;
-
-    /** labeler.py 섹션별 편향 결과 (JSON string) */
-    private String sections;
+    private String articleSources;
+    private String factRatioSource;
+    private Float  sectionBiasScore;
+    private String background;
+    private CotReasons cotReasons;
 
     public AnalysisResultResponse(AnalysisResult result) {
-        this.articleId    = result.getArticle().getId();
-        this.resultId     = result.getId();
-        this.originalText = result.getArticle().getOriginalText();
-        this.sections     = result.getSections();
-        this.totalScore  = result.getTotalScore();
-        this.indicators  = new Indicators(result);
-        this.bias        = new BiasInfo(result);
-        this.summary     = new SummaryInfo(result);
-        this.analyzedAt  = result.getAnalyzedAt();
-        this.sentences   = result.getSentenceAnalyses().stream()
+        this.articleId       = result.getArticle().getId();
+        this.resultId        = result.getId();
+        this.originalText    = result.getArticle().getOriginalText();
+        this.sections        = parseSections(result.getSections());
+        this.articleSources  = result.getSources();
+        this.factRatioSource = result.getFactRatioSource();
+        this.sectionBiasScore = result.getSectionBiasScore();
+        this.background      = result.getBackground();
+        this.cotReasons      = new CotReasons(result);
+        this.totalScore      = result.getTotalScore();
+        this.indicators      = new Indicators(result);
+        this.bias            = new BiasInfo(result);
+        this.summary         = new SummaryInfo(result);
+        this.analyzedAt      = result.getAnalyzedAt();
+        this.sentences       = result.getSentenceAnalyses().stream()
                 .map(SentenceAnalysisResponse::new)
-                .collect(Collectors.toList());
-        this.sources     = result.getSourceReferences().stream()
-                .map(SourceReferenceResponse::new)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 4대 지표
-     * - 감정 중립성 (emotion_neutrality)
-     * - 사실 비율   (fact_ratio)
-     * - 출처 균형   (source_balance)
-     * - 편향 점수   (bias_score)
-     */
+    private static List<SectionInfo> parseSections(String json) {
+        if (json == null || json.isBlank() || json.equals("[]")) return Collections.emptyList();
+        try {
+            return MAPPER.readValue(json, new TypeReference<List<SectionInfo>>() {});
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
+    }
+
+    @Getter
+    @NoArgsConstructor
+    public static class SectionInfo {
+        @JsonProperty("topic")
+        private String topic;
+
+        @JsonProperty("step1_biased_expressions")
+        private List<String> step1BiasedExpressions;
+
+        @JsonProperty("step2_neutral_expressions")
+        private List<String> step2NeutralExpressions;
+
+        @JsonProperty("step3_judgment")
+        private String step3Judgment;
+
+        @JsonProperty("bias_label")
+        private String biasLabel;
+
+        @JsonProperty("confidence")
+        private Double confidence;
+
+        @JsonProperty("reason")
+        private String reason;
+    }
+
     @Getter
     public static class Indicators {
         private Float emotionNeutrality;
@@ -84,29 +107,50 @@ public class AnalysisResultResponse {
         }
     }
 
-    /** 편향 방향 + 스펙트럼 분류 */
     @Getter
     public static class BiasInfo {
         private String biasDirection;
         private String spectrumLabel;
-        private String biaSentence;   // 편향 문장 목록 (JSON string)
+        private String biasLabel;
+        private Float  biasConfidence;
+        private String biasReason;
 
         public BiasInfo(AnalysisResult result) {
-            this.biasDirection = result.getBiasDirection();
-            this.spectrumLabel = result.getSpectrumLabel();
-            this.biaSentence   = result.getBiaSentence();
+            this.biasDirection  = result.getBiasDirection();
+            this.spectrumLabel  = result.getSpectrumLabel();
+            this.biasLabel      = result.getBiasLabel();
+            this.biasConfidence = result.getBiasConfidence();
+            this.biasReason     = result.getBiasReason();
         }
     }
 
-    /** AI가 추출한 제목 + 요약 */
     @Getter
     public static class SummaryInfo {
         private String title;
         private String content;
+        private String keyFacts;
+        private String keywords;
 
         public SummaryInfo(AnalysisResult result) {
-            this.title   = result.getTitle();
-            this.content = result.getSummary();
+            this.title    = result.getTitle();
+            this.content  = result.getSummary();
+            this.keyFacts = result.getKeyFacts();
+            this.keywords = result.getKeywords();
+        }
+    }
+
+    @Getter
+    public static class CotReasons {
+        private String vocab;
+        private String framing;
+        private String citation;
+        private String omission;
+
+        public CotReasons(AnalysisResult result) {
+            this.vocab    = result.getCotVocabReason();
+            this.framing  = result.getCotFramingReason();
+            this.citation = result.getCotCitationReason();
+            this.omission = result.getCotOmissionReason();
         }
     }
 }
