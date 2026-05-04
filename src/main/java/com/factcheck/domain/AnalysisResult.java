@@ -62,7 +62,7 @@ public class AnalysisResult {
     @Column(name = "analyzed_at")
     private LocalDateTime analyzedAt;
 
-    @Column(name = "bia_sentence", columnDefinition = "JSON")
+    @Column(name = "key_facts", columnDefinition = "JSON")
     private String keyFacts;
 
     @Column(name = "keywords", columnDefinition = "JSON")
@@ -96,7 +96,7 @@ public class AnalysisResult {
     private String cotOmissionReason;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ARTICLE_ID")
+    @JoinColumn(name = "ARTICLE_ID", unique = true)
     private Article article;
 
     @OneToMany(mappedBy = "analysisResult", cascade = CascadeType.ALL, orphanRemoval = true)

@@ -1,41 +1,35 @@
 package com.factcheck.dto.response;
 
 import com.factcheck.domain.AnalysisResult;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
  * GET /api/v1/articles/{id}/result 응답 DTO
- * 명세 FR-09: 종합 결과 JSON (신뢰도, 4대 지표, 편향, 요약, 문장별 하이라이트, 출처)
  */
 @Getter
 public class AnalysisResultResponse {
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     private Long articleId;
     private Long resultId;
-
-    /** 신뢰도 종합 점수 (0~100) */
     private Integer totalScore;
-
-    /** 4대 지표 */
     private Indicators indicators;
-
-    /** 편향 분석 */
     private BiasInfo bias;
-
-    /** 요약 정보 */
     private SummaryInfo summary;
-
-    /** 문장별 하이라이트 목록 (FR-09: 문장별 하이라이트) */
+    private List<SectionInfo> sections;
     private List<SentenceAnalysisResponse> sentences;
-
     private LocalDateTime analyzedAt;
-
     private String originalText;
-    private String sections;
     private String articleSources;
     private String factRatioSource;
     private Float  sectionBiasScore;
@@ -46,7 +40,7 @@ public class AnalysisResultResponse {
         this.articleId       = result.getArticle().getId();
         this.resultId        = result.getId();
         this.originalText    = result.getArticle().getOriginalText();
-        this.sections        = result.getSections();
+        this.sections        = parseSections(result.getSections());
         this.articleSources  = result.getSources();
         this.factRatioSource = result.getFactRatioSource();
         this.sectionBiasScore = result.getSectionBiasScore();
@@ -62,13 +56,40 @@ public class AnalysisResultResponse {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * 4대 지표
-     * - 감정 중립성 (emotion_neutrality)
-     * - 사실 비율   (fact_ratio)
-     * - 출처 균형   (source_balance)
-     * - 편향 점수   (bias_score)
-     */
+    private static List<SectionInfo> parseSections(String json) {
+        if (json == null || json.isBlank() || json.equals("[]")) return Collections.emptyList();
+        try {
+            return MAPPER.readValue(json, new TypeReference<List<SectionInfo>>() {});
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
+    }
+
+    @Getter
+    @NoArgsConstructor
+    public static class SectionInfo {
+        @JsonProperty("topic")
+        private String topic;
+
+        @JsonProperty("step1_biased_expressions")
+        private List<String> step1BiasedExpressions;
+
+        @JsonProperty("step2_neutral_expressions")
+        private List<String> step2NeutralExpressions;
+
+        @JsonProperty("step3_judgment")
+        private String step3Judgment;
+
+        @JsonProperty("bias_label")
+        private String biasLabel;
+
+        @JsonProperty("confidence")
+        private Double confidence;
+
+        @JsonProperty("reason")
+        private String reason;
+    }
+
     @Getter
     public static class Indicators {
         private Float emotionNeutrality;
@@ -86,7 +107,6 @@ public class AnalysisResultResponse {
         }
     }
 
-    /** 편향 방향 + 스펙트럼 분류 + 라벨링 결과 */
     @Getter
     public static class BiasInfo {
         private String biasDirection;
@@ -104,7 +124,6 @@ public class AnalysisResultResponse {
         }
     }
 
-    /** AI가 추출한 제목 + 요약 + 핵심 사실 + 키워드 */
     @Getter
     public static class SummaryInfo {
         private String title;
@@ -120,7 +139,6 @@ public class AnalysisResultResponse {
         }
     }
 
-    /** CoT 4단계 근거 텍스트 */
     @Getter
     public static class CotReasons {
         private String vocab;

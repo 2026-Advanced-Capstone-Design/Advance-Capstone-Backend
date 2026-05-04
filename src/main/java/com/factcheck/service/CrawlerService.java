@@ -1,5 +1,7 @@
 package com.factcheck.service;
 
+import com.factcheck.global.exception.BusinessException;
+import com.factcheck.global.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -34,9 +36,7 @@ public class CrawlerService {
 
         } catch (IOException e) {
             log.warn("URL 크롤링 실패: {} - {}", url, e.getMessage());
-            result.put("title", "");
-            result.put("body", "");
-            result.put("publisher", "");
+            throw new BusinessException(ErrorCode.CRAWL_FAILED);
         }
 
         return result;

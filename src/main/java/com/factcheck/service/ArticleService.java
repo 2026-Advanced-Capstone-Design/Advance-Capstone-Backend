@@ -89,14 +89,13 @@ public class ArticleService {
                     String body = crawled.get("body");
                     String title = crawled.get("title");
 
-                    String processedText = "";
-                    if (body != null && !body.isBlank()) {
-                        List<String> sentences = preprocessService.splitOnly(body);
-                        processedText = String.join("\n", sentences);
-                        log.info("URL 크롤링 완료: {} - {}자", url, processedText.length());
-                    } else {
+                    if (body == null || body.isBlank()) {
                         log.warn("URL 크롤링 결과 본문 없음: {}", url);
+                        throw new BusinessException(ErrorCode.CRAWL_FAILED);
                     }
+                    List<String> sentences = preprocessService.splitOnly(body);
+                    String processedText = String.join("\n", sentences);
+                    log.info("URL 크롤링 완료: {} - {}자", url, processedText.length());
 
                     Article article = request.toEntity(title, processedText);
                     articleRepository.save(article);

@@ -4,12 +4,14 @@ import com.factcheck.Enum.ArticleStatus;
 import com.factcheck.domain.AnalysisResult;
 import com.factcheck.domain.Article;
 import com.factcheck.domain.SentenceAnalysis;
+import com.factcheck.domain.SourceReference;
 import com.factcheck.dto.request.AiCallbackRequest;
 import com.factcheck.global.exception.BusinessException;
 import com.factcheck.global.exception.ErrorCode;
 import com.factcheck.repository.AnalysisResultRepository;
 import com.factcheck.repository.ArticleRepository;
 import com.factcheck.repository.SentenceAnalysisRepository;
+import com.factcheck.repository.SourceReferenceRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ public class AnalysisCallbackService {
     private final ArticleRepository articleRepository;
     private final AnalysisResultRepository analysisResultRepository;
     private final SentenceAnalysisRepository sentenceAnalysisRepository;
+    private final SourceReferenceRepository sourceReferenceRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /*
@@ -45,6 +48,11 @@ public class AnalysisCallbackService {
         if ("FAILED".equals(req.getStatus())) {
             article.updateStatus(ArticleStatus.FAILED);
             log.warn("AI 분석 실패: articleId={}, error={}", req.getArticleId(), req.getError());
+            return;
+        }
+
+        if (analysisResultRepository.findByArticleId(req.getArticleId()).isPresent()) {
+            log.warn("중복 콜백 무시: articleId={}", req.getArticleId());
             return;
         }
 
@@ -104,11 +112,24 @@ public class AnalysisCallbackService {
             }
         }
 
+        List<String> sources = req.getSources();
+        if (sources != null && !sources.isEmpty()) {
+            for (String sourceName : sources) {
+                SourceReference ref = SourceReference.builder()
+                        .sourceName(sourceName)
+                        .analysisResult(result)
+                        .article(article)
+                        .build();
+                sourceReferenceRepository.save(ref);
+            }
+        }
+
         article.updateStatus(ArticleStatus.DONE);
 
-        log.info("AI 분석 완료 저장: articleId={}, highlights={}건, keywords=[{}]",
+        log.info("AI 분석 완료 저장: articleId={}, highlights={}건, sources={}건, keywords=[{}]",
                 req.getArticleId(),
                 highlights != null ? highlights.size() : 0,
+                sources != null ? sources.size() : 0,
                 keywordsStr);
     }
 

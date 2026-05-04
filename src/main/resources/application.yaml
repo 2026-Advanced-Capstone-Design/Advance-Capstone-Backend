@@ -37,8 +37,8 @@ ocr:
 # Clova OCR fallback 설정
 clova:
   ocr:
-    api-url: https://XXXX.apigw.ntruss.com/custom/v1/XXXX/XXXX/general
-    secret-key: your_clova_secret_key
+    api-url: ${CLOVA_OCR_API_URL:}
+    secret-key: ${CLOVA_OCR_SECRET_KEY:}
 
 # Python AI 서버 주소 (추후 연동용)
 ai:
