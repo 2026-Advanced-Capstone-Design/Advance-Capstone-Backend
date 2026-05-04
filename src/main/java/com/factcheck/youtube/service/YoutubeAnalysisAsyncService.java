@@ -55,7 +55,10 @@ public class YoutubeAnalysisAsyncService {
                     aiResponse.neutralPct(),
                     aiResponse.botCount(),
                     aiResponse.botPct(),
-                    aiResponse.summary(),
+                    aiResponse.positiveSummary(),
+                    aiResponse.negativeSummary(),
+                    aiResponse.neutralSummary(),
+                    aiResponse.specialNotes(),
                     toCommentsJson(aiResponse)
             );
             youtubeAnalysisResultRepository.save(result);

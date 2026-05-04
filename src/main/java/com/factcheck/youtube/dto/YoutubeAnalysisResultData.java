@@ -17,7 +17,10 @@ public record YoutubeAnalysisResultData(
         double neutralPct,
         int botCount,
         double botPct,
-        String summary,
+        String positiveSummary,
+        String negativeSummary,
+        String neutralSummary,
+        String specialNotes,
         List<YoutubeAiCommentAnalysis> comments
 ) {
 }

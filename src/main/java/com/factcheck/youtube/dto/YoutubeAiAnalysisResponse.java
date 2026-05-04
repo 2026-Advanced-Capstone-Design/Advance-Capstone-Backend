@@ -29,7 +29,14 @@ public record YoutubeAiAnalysisResponse(
         int botCount,
         @JsonProperty("bot_pct")
         double botPct,
-        String summary,
+        @JsonProperty("positive_summary")
+        String positiveSummary,
+        @JsonProperty("negative_summary")
+        String negativeSummary,
+        @JsonProperty("neutral_summary")
+        String neutralSummary,
+        @JsonProperty("special_notes")
+        String specialNotes,
         List<YoutubeAiCommentAnalysis> comments
 ) {
 }

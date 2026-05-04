@@ -70,8 +70,20 @@ public class YoutubeAnalysisResult {
     private double botPct;
 
     @Lob
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String summary;
+    @Column(name = "positive_summary", nullable = false, columnDefinition = "TEXT")
+    private String positiveSummary;
+
+    @Lob
+    @Column(name = "negative_summary", nullable = false, columnDefinition = "TEXT")
+    private String negativeSummary;
+
+    @Lob
+    @Column(name = "neutral_summary", nullable = false, columnDefinition = "TEXT")
+    private String neutralSummary;
+
+    @Lob
+    @Column(name = "special_notes", nullable = false, columnDefinition = "TEXT")
+    private String specialNotes;
 
     @Lob
     @Column(name = "comments_json", nullable = false, columnDefinition = "LONGTEXT")
@@ -102,7 +114,10 @@ public class YoutubeAnalysisResult {
             double neutralPct,
             int botCount,
             double botPct,
-            String summary,
+            String positiveSummary,
+            String negativeSummary,
+            String neutralSummary,
+            String specialNotes,
             String commentsJson
     ) {
         this.analysisRequest = analysisRequest;
@@ -120,7 +135,10 @@ public class YoutubeAnalysisResult {
         this.neutralPct = neutralPct;
         this.botCount = botCount;
         this.botPct = botPct;
-        this.summary = summary;
+        this.positiveSummary = positiveSummary;
+        this.negativeSummary = negativeSummary;
+        this.neutralSummary = neutralSummary;
+        this.specialNotes = specialNotes;
         this.commentsJson = commentsJson;
     }
 
@@ -140,7 +158,10 @@ public class YoutubeAnalysisResult {
             double neutralPct,
             int botCount,
             double botPct,
-            String summary,
+            String positiveSummary,
+            String negativeSummary,
+            String neutralSummary,
+            String specialNotes,
             String commentsJson
     ) {
         return new YoutubeAnalysisResult(
@@ -159,7 +180,10 @@ public class YoutubeAnalysisResult {
                 neutralPct,
                 botCount,
                 botPct,
-                summary,
+                positiveSummary,
+                negativeSummary,
+                neutralSummary,
+                specialNotes,
                 commentsJson
         );
     }
@@ -240,8 +264,20 @@ public class YoutubeAnalysisResult {
         return botPct;
     }
 
-    public String getSummary() {
-        return summary;
+    public String getPositiveSummary() {
+        return positiveSummary;
+    }
+
+    public String getNegativeSummary() {
+        return negativeSummary;
+    }
+
+    public String getNeutralSummary() {
+        return neutralSummary;
+    }
+
+    public String getSpecialNotes() {
+        return specialNotes;
     }
 
     public String getCommentsJson() {
