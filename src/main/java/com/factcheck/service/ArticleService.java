@@ -50,6 +50,7 @@ public class ArticleService {
         return new AnalysisStatusResponse(article);
     }
 
+    @Transactional(readOnly = true)
     public AnalysisResultResponse getResult(Long articleId) {
         articleRepository.findById(articleId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ARTICLE_NOT_FOUND));
