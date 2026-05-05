@@ -20,9 +20,11 @@ import org.springframework.util.DigestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -50,6 +52,7 @@ public class ArticleService {
         return new AnalysisStatusResponse(article);
     }
 
+    @Transactional(readOnly = true)
     public AnalysisResultResponse getResult(Long articleId) {
         articleRepository.findById(articleId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ARTICLE_NOT_FOUND));
@@ -139,15 +142,23 @@ public class ArticleService {
 
     private String saveImage(MultipartFile image) {
         try {
-            Path uploadPath = Paths.get(IMAGE_UPLOAD_DIR);
+            Path uploadPath = Paths.get(IMAGE_UPLOAD_DIR).toAbsolutePath();
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
             }
             String fileName = UUID.randomUUID() + "_" + image.getOriginalFilename();
             Path filePath = uploadPath.resolve(fileName);
-            image.transferTo(filePath.toFile());
+
+            log.info("이미지 저장 시도: uploadPath={}, fileName={}", uploadPath, fileName);
+
+            try (InputStream inputStream = image.getInputStream()) {
+                Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
+            }
+            log.info("이미지 저장 성공: {}", filePath);
             return filePath.toString();
         } catch (IOException e) {
+            log.error("이미지 저장 실패: dir={}, fileName={}, error={}",
+                    IMAGE_UPLOAD_DIR, image.getOriginalFilename(), e.getMessage(), e);
             throw new BusinessException(ErrorCode.IMAGE_UPLOAD_FAILED);
         }
     }
