@@ -24,7 +24,7 @@ ai:
     url: ${AI_ENGINE_URL:http://ai-engine:5000}
 
 ocr:
-  tessdata-path: /usr/share/tesseract-ocr/5/tessdata
+  tessdata-path: /usr/share/tesseract-ocr/4.00/tessdata
   language: kor+eng
 
 clova:
@@ -34,4 +34,4 @@ clova:
 
 youtube:
   api:
-    key: ${YOUTUBE_API_KEY}
+    key: ${YOUTUBE_API_KEY:}

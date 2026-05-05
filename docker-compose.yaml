@@ -15,7 +15,6 @@ services:
       - "3308:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
@@ -36,6 +35,8 @@ services:
       SPRING_DATASOURCE_USERNAME: newslens
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-newslens1234}
       AI_ENGINE_URL: http://ai-engine:5000
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      YOUTUBE_AI_ANALYSIS_URL: http://youtube-ai:8000/analyze/youtube
     ports:
       - "8080:8080"
     depends_on:
