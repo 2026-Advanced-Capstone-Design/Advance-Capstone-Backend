@@ -40,13 +40,16 @@ public class OcrService {
         File tempFile = File.createTempFile("ocr_", "_" + imageFile.getOriginalFilename());
         imageFile.transferTo(tempFile);
 
+        File pngFile = convertToPng(tempFile);
+        File processFile = pngFile != null ? pngFile : tempFile;
+
         try {
-            String tesseractResult = runTesseract(tempFile);
+            String tesseractResult = runTesseract(processFile);
             log.info("Tesseract 결과 길이: {}", tesseractResult.length());
 
             if (tesseractResult.trim().length() < MIN_QUALITY_LENGTH) {
                 log.info("Tesseract 품질 미흡, Clova OCR fallback 시도");
-                String clovaResult = runClovaOcr(tempFile);
+                String clovaResult = runClovaOcr(processFile);
                 if (!clovaResult.isBlank()) {
                     return clovaResult;
                 }
@@ -56,6 +59,23 @@ public class OcrService {
 
         } finally {
             tempFile.delete();
+            if (pngFile != null) pngFile.delete();
+        }
+    }
+
+    private File convertToPng(File imageFile) {
+        try {
+            BufferedImage image = ImageIO.read(imageFile);
+            if (image == null) {
+                log.warn("이미지 포맷 변환 불가 (HEIC 등 미지원 포맷): {}", imageFile.getName());
+                return null;
+            }
+            File pngFile = File.createTempFile("ocr_converted_", ".png");
+            ImageIO.write(image, "PNG", pngFile);
+            return pngFile;
+        } catch (IOException e) {
+            log.warn("PNG 변환 실패: {}", e.getMessage());
+            return null;
         }
     }
 
@@ -67,6 +87,10 @@ public class OcrService {
 
         try {
             BufferedImage image = ImageIO.read(imageFile);
+            if (image == null) {
+                log.warn("Tesseract: 이미지 읽기 실패");
+                return "";
+            }
             return tesseract.doOCR(image);
         } catch (TesseractException | IOException e) {
             log.warn("Tesseract OCR 실패: {}", e.getMessage());
@@ -86,7 +110,7 @@ public class OcrService {
                       "timestamp": %d,
                       "images": [
                         {
-                          "format": "jpg",
+                          "format": "png",
                           "name": "news_image",
                           "data": "%s"
                         }
