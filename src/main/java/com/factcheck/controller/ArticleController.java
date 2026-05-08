@@ -6,9 +6,12 @@ import com.factcheck.dto.request.UrlRequest;
 import com.factcheck.dto.response.AnalyzeResponse;
 import com.factcheck.dto.response.AnalysisResultResponse;
 import com.factcheck.dto.response.AnalysisStatusResponse;
+import com.factcheck.dto.response.RelatedArticleResponse;
 import com.factcheck.service.ArticleService;
+import com.factcheck.service.NaverNewsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import java.util.List;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class ArticleController {
 
     private final ArticleService articleService;
+    private final NaverNewsService naverNewsService;
 
     /**
      * 텍스트 분석 요청
@@ -80,6 +84,17 @@ public class ArticleController {
             @PathVariable Long id) {
         AnalysisResultResponse response = articleService.getResult(id);
         return ResponseEntity.ok(ApiResponse.ok(response, "분석 결과 조회 성공"));
+    }
+
+    /**
+     * 관련 기사 조회
+     * GET /api/v1/articles/{id}/related
+     */
+    @GetMapping("/{id}/related")
+    public ResponseEntity<ApiResponse<List<RelatedArticleResponse>>> getRelatedArticles(
+            @PathVariable Long id) {
+        List<RelatedArticleResponse> response = naverNewsService.getRelatedArticles(id);
+        return ResponseEntity.ok(ApiResponse.ok(response, "관련 기사 조회 성공"));
     }
 
 }
