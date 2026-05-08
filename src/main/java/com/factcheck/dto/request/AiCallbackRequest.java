@@ -10,6 +10,7 @@ import java.util.List;
 @NoArgsConstructor
 public class AiCallbackRequest {
 
+    //자바 객체를 JSON 형태로 해서 반환해주는 객체
     @JsonProperty("article_id")
     private Long articleId;
 
@@ -19,8 +20,8 @@ public class AiCallbackRequest {
     @JsonProperty("error")
     private String error;
 
-    @JsonProperty("one_line_summary")
-    private String oneLineSummary;
+    @JsonProperty("compressed_text")
+    private String compressedText;
 
     @JsonProperty("key_facts")
     private List<String> keyFacts;
@@ -33,9 +34,6 @@ public class AiCallbackRequest {
 
     @JsonProperty("sentence_count")
     private Integer sentenceCount;
-
-    @JsonProperty("sources")
-    private List<String> sources;
 
     @JsonProperty("bias_label")
     private String biasLabel;

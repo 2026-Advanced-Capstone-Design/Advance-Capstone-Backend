@@ -27,10 +27,10 @@ public class AnalysisResultResponse {
     private BiasInfo bias;
     private SummaryInfo summary;
     private List<SectionInfo> sections;
+    private String cleanedText;
     private List<SentenceAnalysisResponse> sentences;
     private LocalDateTime analyzedAt;
     private String originalText;
-    private String articleSources;
     private String factRatioSource;
     private Float  sectionBiasScore;
     private String background;
@@ -41,7 +41,7 @@ public class AnalysisResultResponse {
         this.resultId        = result.getId();
         this.originalText    = result.getArticle().getOriginalText();
         this.sections        = parseSections(result.getSections());
-        this.articleSources  = result.getSources();
+        this.cleanedText     = result.getCleanedText();
         this.factRatioSource = result.getFactRatioSource();
         this.sectionBiasScore = result.getSectionBiasScore();
         this.background      = result.getBackground();
@@ -127,13 +127,11 @@ public class AnalysisResultResponse {
     @Getter
     public static class SummaryInfo {
         private String title;
-        private String content;
         private String keyFacts;
         private String keywords;
 
         public SummaryInfo(AnalysisResult result) {
             this.title    = result.getTitle();
-            this.content  = result.getSummary();
             this.keyFacts = result.getKeyFacts();
             this.keywords = result.getKeywords();
         }

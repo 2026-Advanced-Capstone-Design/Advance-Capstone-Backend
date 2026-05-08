@@ -53,9 +53,6 @@ public class AnalysisResult {
     @Column(name = "title", columnDefinition = "TEXT")
     private String title;
 
-    @Column(name = "summary", columnDefinition = "TEXT")
-    private String summary;
-
     @Column(name = "spectrum_label", length = 50)
     private String spectrumLabel;
 
@@ -71,8 +68,8 @@ public class AnalysisResult {
     @Column(name = "sections", columnDefinition = "JSON")
     private String sections;
 
-    @Column(name = "sources", columnDefinition = "JSON")
-    private String sources;
+    @Column(name = "cleaned_text", columnDefinition = "TEXT")
+    private String cleanedText;
 
     @Column(name = "fact_ratio_source", length = 10)
     private String factRatioSource;
@@ -102,15 +99,12 @@ public class AnalysisResult {
     @OneToMany(mappedBy = "analysisResult", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SentenceAnalysis> sentenceAnalyses = new ArrayList<>();
 
-    @OneToMany(mappedBy = "analysisResult", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<SourceReference> sourceReferences = new ArrayList<>();
-
     @Builder
     public AnalysisResult(Integer totalScore, Float emotionNeutrality, Float factRatio,
                           Float sourceBalance, Float omissionNeutrality, Float biasScore,
                           String biasDirection, String biasLabel, Float biasConfidence, String biasReason,
-                          String title, String summary, String spectrumLabel,
-                          String keyFacts, String keywords, String sections, String sources,
+                          String title, String spectrumLabel,
+                          String keyFacts, String keywords, String sections, String cleanedText,
                           String factRatioSource, Float sectionBiasScore,
                           String background, String cotVocabReason, String cotFramingReason,
                           String cotCitationReason, String cotOmissionReason, Article article) {
@@ -125,12 +119,11 @@ public class AnalysisResult {
         this.biasConfidence = biasConfidence;
         this.biasReason     = biasReason;
         this.title = title;
-        this.summary = summary;
         this.spectrumLabel = spectrumLabel;
         this.keyFacts  = keyFacts;
         this.keywords  = keywords;
         this.sections = sections;
-        this.sources = sources;
+        this.cleanedText = cleanedText;
         this.factRatioSource = factRatioSource;
         this.sectionBiasScore = sectionBiasScore;
         this.background = background;
