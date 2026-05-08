@@ -40,7 +40,12 @@ clova:
     api-url: ${CLOVA_OCR_API_URL:}
     secret-key: ${CLOVA_OCR_SECRET_KEY:}
 
-# Python AI 서버 주소 (추후 연동용)
+youtube:
+  api:
+    key: ${YOUTUBE_API_KEY:}
+
 ai:
   server:
     url: http://localhost:5000
+  youtube:
+    analysis-url: ${YOUTUBE_AI_ANALYSIS_URL:http://localhost:8000/analyze/youtube}

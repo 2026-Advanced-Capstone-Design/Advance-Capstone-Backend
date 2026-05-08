@@ -4,14 +4,12 @@ import com.factcheck.Enum.ArticleStatus;
 import com.factcheck.domain.AnalysisResult;
 import com.factcheck.domain.Article;
 import com.factcheck.domain.SentenceAnalysis;
-import com.factcheck.domain.SourceReference;
 import com.factcheck.dto.request.AiCallbackRequest;
 import com.factcheck.global.exception.BusinessException;
 import com.factcheck.global.exception.ErrorCode;
 import com.factcheck.repository.AnalysisResultRepository;
 import com.factcheck.repository.ArticleRepository;
 import com.factcheck.repository.SentenceAnalysisRepository;
-import com.factcheck.repository.SourceReferenceRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +27,6 @@ public class AnalysisCallbackService {
     private final ArticleRepository articleRepository;
     private final AnalysisResultRepository analysisResultRepository;
     private final SentenceAnalysisRepository sentenceAnalysisRepository;
-    private final SourceReferenceRepository sourceReferenceRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /*
@@ -63,16 +60,15 @@ public class AnalysisCallbackService {
         String sectionsJson  = toJson(req.getSections());
         String keyFactsJson  = toJson(req.getKeyFacts());
         String keywordsJson  = toJson(req.getKeywords());
-        String sourcesJson   = toJson(req.getSources());
+        String cleanedText   = req.getCompressedText() != null ? req.getCompressedText() : "";
 
         AnalysisResult result = AnalysisResult.builder()
                 .article(article)
-                .summary(req.getOneLineSummary())
                 .title(req.getTopic())
                 .keyFacts(keyFactsJson)
                 .keywords(keywordsJson)
                 .sections(sectionsJson)
-                .sources(sourcesJson)
+                .cleanedText(cleanedText)
                 .factRatioSource(req.getFactRatioSource())
                 .sectionBiasScore(req.getSectionBiasScore() != null ? req.getSectionBiasScore().floatValue() : null)
                 .background(req.getBackground())
@@ -112,24 +108,11 @@ public class AnalysisCallbackService {
             }
         }
 
-        List<String> sources = req.getSources();
-        if (sources != null && !sources.isEmpty()) {
-            for (String sourceName : sources) {
-                SourceReference ref = SourceReference.builder()
-                        .sourceName(sourceName)
-                        .analysisResult(result)
-                        .article(article)
-                        .build();
-                sourceReferenceRepository.save(ref);
-            }
-        }
-
         article.updateStatus(ArticleStatus.DONE);
 
-        log.info("AI 분석 완료 저장: articleId={}, highlights={}건, sources={}건, keywords=[{}]",
+        log.info("AI 분석 완료 저장: articleId={}, highlights={}건, keywords=[{}]",
                 req.getArticleId(),
                 highlights != null ? highlights.size() : 0,
-                sources != null ? sources.size() : 0,
                 keywordsStr);
     }
 

@@ -42,4 +42,6 @@ out/
 .env
 .env.prod
 application-local.yaml
+
+### Separate repos ###
 youtube-ai-engine/

@@ -24,10 +24,14 @@ ai:
     url: ${AI_ENGINE_URL:http://ai-engine:5000}
 
 ocr:
-  tessdata-path: /usr/share/tesseract-ocr/5/tessdata
+  tessdata-path: /usr/share/tesseract-ocr/4.00/tessdata
   language: kor+eng
 
 clova:
   ocr:
     api-url: ${CLOVA_OCR_API_URL:}
     secret-key: ${CLOVA_OCR_SECRET_KEY:}
+
+youtube:
+  api:
+    key: ${YOUTUBE_API_KEY:}

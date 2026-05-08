@@ -11,7 +11,7 @@ COPY src ./src
 RUN gradle bootJar --no-daemon -x test
 
 # ============ Run Stage ============
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
 COPY --from=build /app/build/libs/*.jar app.jar
@@ -21,7 +21,7 @@ RUN apt-get update && \
     apt-get install -y tesseract-ocr tesseract-ocr-kor tesseract-ocr-eng && \
     rm -rf /var/lib/apt/lists/*
 
-
+ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/4.00/tessdata
 
 EXPOSE 8080
 
