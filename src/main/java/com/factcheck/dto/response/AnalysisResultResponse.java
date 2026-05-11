@@ -1,109 +1,57 @@
 package com.factcheck.dto.response;
 
 import com.factcheck.domain.AnalysisResult;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.factcheck.domain.AnalysisSection;
+import com.factcheck.domain.FactCheckResult;
+import com.factcheck.domain.SentenceAnalysis;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
-/**
- * GET /api/v1/articles/{id}/result 응답 DTO
- */
 @Getter
 public class AnalysisResultResponse {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private Long articleId;
     private Long resultId;
     private Integer totalScore;
+    private String originalText;
     private Indicators indicators;
     private BiasInfo bias;
     private SummaryInfo summary;
-    private List<SectionInfo> sections;
-    private String cleanedText;
-    private List<SentenceAnalysisResponse> sentences;
-    private LocalDateTime analyzedAt;
-    private String originalText;
-    private String factRatioSource;
-    private Float  sectionBiasScore;
-    private String background;
     private CotReasons cotReasons;
+    private List<SectionInfo> sections;
+    private List<SentenceInfo> sentences;
+    private List<FactCheckInfo> factChecks;
+    private LocalDateTime analyzedAt;
 
     public AnalysisResultResponse(AnalysisResult result) {
-        this.articleId       = result.getArticle().getId();
-        this.resultId        = result.getId();
-        this.originalText    = result.getArticle().getOriginalText();
-        this.sections        = parseSections(result.getSections());
-        this.cleanedText     = result.getCleanedText();
-        this.factRatioSource = result.getFactRatioSource();
-        this.sectionBiasScore = result.getSectionBiasScore();
-        this.background      = result.getBackground();
-        this.cotReasons      = new CotReasons(result);
-        this.totalScore      = result.getTotalScore();
-        this.indicators      = new Indicators(result);
-        this.bias            = new BiasInfo(result);
-        this.summary         = new SummaryInfo(result);
-        this.analyzedAt      = result.getAnalyzedAt();
-        this.sentences       = result.getSentenceAnalyses().stream()
-                .map(SentenceAnalysisResponse::new)
-                .collect(Collectors.toList());
-    }
-
-    private static List<SectionInfo> parseSections(String json) {
-        if (json == null || json.isBlank() || json.equals("[]")) return Collections.emptyList();
-        try {
-            return MAPPER.readValue(json, new TypeReference<List<SectionInfo>>() {});
-        } catch (Exception e) {
-            return Collections.emptyList();
-        }
-    }
-
-    @Getter
-    @NoArgsConstructor
-    public static class SectionInfo {
-        @JsonProperty("topic")
-        private String topic;
-
-        @JsonProperty("step1_biased_expressions")
-        private List<String> step1BiasedExpressions;
-
-        @JsonProperty("step2_neutral_expressions")
-        private List<String> step2NeutralExpressions;
-
-        @JsonProperty("step3_judgment")
-        private String step3Judgment;
-
-        @JsonProperty("bias_label")
-        private String biasLabel;
-
-        @JsonProperty("confidence")
-        private Double confidence;
-
-        @JsonProperty("reason")
-        private String reason;
+        this.articleId    = result.getArticle().getId();
+        this.resultId     = result.getId();
+        this.totalScore   = result.getTotalScore();
+        this.originalText = result.getCompressedText();
+        this.indicators   = new Indicators(result);
+        this.bias         = new BiasInfo(result);
+        this.summary      = new SummaryInfo(result);
+        this.cotReasons   = new CotReasons(result);
+        this.sections     = result.getSections().stream().map(SectionInfo::new).toList();
+        this.sentences    = result.getSentences().stream().map(SentenceInfo::new).toList();
+        this.factChecks   = result.getFactCheckResults().stream().map(FactCheckInfo::new).toList();
+        this.analyzedAt   = result.getAnalyzedAt();
     }
 
     @Getter
     public static class Indicators {
-        private Float emotionNeutrality;
         private Float factRatio;
-        private Float sourceBalance;
+        private Float emotionNeutrality;
         private Float omissionNeutrality;
         private Float biasScore;
 
-        public Indicators(AnalysisResult result) {
-            this.emotionNeutrality  = result.getEmotionNeutrality();
-            this.factRatio          = result.getFactRatio();
-            this.sourceBalance      = result.getSourceBalance();
-            this.omissionNeutrality = result.getOmissionNeutrality();
-            this.biasScore          = result.getBiasScore();
+        public Indicators(AnalysisResult r) {
+            this.factRatio          = r.getFactRatio();
+            this.emotionNeutrality  = r.getEmotionNeutrality();
+            this.omissionNeutrality = null;
+            this.biasScore          = r.getBiasScore();
         }
     }
 
@@ -111,44 +59,85 @@ public class AnalysisResultResponse {
     public static class BiasInfo {
         private String biasDirection;
         private String spectrumLabel;
-        private String biasLabel;
-        private Float  biasConfidence;
         private String biasReason;
 
-        public BiasInfo(AnalysisResult result) {
-            this.biasDirection  = result.getBiasDirection();
-            this.spectrumLabel  = result.getSpectrumLabel();
-            this.biasLabel      = result.getBiasLabel();
-            this.biasConfidence = result.getBiasConfidence();
-            this.biasReason     = result.getBiasReason();
+        public BiasInfo(AnalysisResult r) {
+            this.biasDirection = r.getBiasDirection();
+            this.spectrumLabel = r.getBiasLabel();
+            this.biasReason    = r.getBiasReason();
         }
     }
 
     @Getter
     public static class SummaryInfo {
         private String title;
-        private String keyFacts;
         private String keywords;
 
-        public SummaryInfo(AnalysisResult result) {
-            this.title    = result.getTitle();
-            this.keyFacts = result.getKeyFacts();
-            this.keywords = result.getKeywords();
+        public SummaryInfo(AnalysisResult r) {
+            this.title    = r.getTitle();
+            this.keywords = r.getKeywords();
         }
     }
 
     @Getter
     public static class CotReasons {
-        private String vocab;
-        private String framing;
-        private String citation;
-        private String omission;
+        private String emotionNeutrality;
+        private String factRatio;
 
-        public CotReasons(AnalysisResult result) {
-            this.vocab    = result.getCotVocabReason();
-            this.framing  = result.getCotFramingReason();
-            this.citation = result.getCotCitationReason();
-            this.omission = result.getCotOmissionReason();
+        public CotReasons(AnalysisResult r) {
+            this.emotionNeutrality = r.getCotEmotionReason();
+            this.factRatio         = r.getCotFactRatioReason();
+        }
+    }
+
+    @Getter
+    public static class SectionInfo {
+        private String topic;
+        private String biasLabel;
+        private Float confidence;
+        private String reason;
+
+        public SectionInfo(AnalysisSection s) {
+            this.topic      = s.getTopic();
+            this.biasLabel  = s.getBiasLabel();
+            this.confidence = s.getConfidence();
+            this.reason     = s.getReason();
+        }
+    }
+
+    @Getter
+    public static class SentenceInfo {
+        private String sentenceText;
+        private String highlightType;
+        private String highlightReason;
+        private Float highlightScore;
+
+        public SentenceInfo(SentenceAnalysis s) {
+            this.sentenceText    = s.getSentenceText();
+            this.highlightType   = s.getHighlightType();
+            this.highlightReason = s.getHighlightReason();
+            this.highlightScore  = s.getHighlightScore();
+        }
+    }
+
+    @Getter
+    public static class FactCheckInfo {
+        private String fact;
+        private Boolean found;
+        private String rating;
+        private Float score;
+        private String title;
+        private String publisher;
+        private String url;
+
+        public FactCheckInfo(FactCheckResult fc) {
+            this.fact      = fc.getFact();
+            this.found     = fc.getFound();
+            this.rating    = fc.getRating();
+            this.score     = fc.getScore();
+            this.title     = fc.getTitle();
+            this.publisher = fc.getPublisher();
+            this.url       = fc.getUrl();
         }
     }
 }

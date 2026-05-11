@@ -10,7 +10,6 @@ import java.util.List;
 @NoArgsConstructor
 public class AiCallbackRequest {
 
-    //자바 객체를 JSON 형태로 해서 반환해주는 객체
     @JsonProperty("article_id")
     private Long articleId;
 
@@ -23,17 +22,11 @@ public class AiCallbackRequest {
     @JsonProperty("compressed_text")
     private String compressedText;
 
-    @JsonProperty("key_facts")
-    private List<String> keyFacts;
-
     @JsonProperty("keywords")
     private List<String> keywords;
 
     @JsonProperty("topic")
     private String topic;
-
-    @JsonProperty("sentence_count")
-    private Integer sentenceCount;
 
     @JsonProperty("bias_label")
     private String biasLabel;
@@ -44,11 +37,14 @@ public class AiCallbackRequest {
     @JsonProperty("bias_reason")
     private String biasReason;
 
+    @JsonProperty("sections")
+    private List<SectionResult> sections;
+
+    @JsonProperty("highlighted_sentences")
+    private List<HighlightedSentence> highlightedSentences;
+
     @JsonProperty("bias_direction")
     private String biasDirection;
-
-    @JsonProperty("spectrum_label")
-    private String spectrumLabel;
 
     @JsonProperty("emotion_neutrality")
     private Double emotionNeutrality;
@@ -57,45 +53,48 @@ public class AiCallbackRequest {
     private Double factRatio;
 
     @JsonProperty("fact_ratio_source")
-    private String factRatioSource;
-
-    @JsonProperty("source_balance")
-    private Double sourceBalance;
-
-    @JsonProperty("omission_neutrality")
-    private Double omissionNeutrality;
+    private Double factRatioSource;
 
     @JsonProperty("bias_score")
     private Double biasScore;
 
-    @JsonProperty("section_bias_score")
-    private Double sectionBiasScore;
-
     @JsonProperty("total_score")
     private Integer totalScore;
 
-    @JsonProperty("background")
-    private String background;
+    @JsonProperty("cot_emotion_reason")
+    private String cotEmotionReason;
 
-    @JsonProperty("cot_vocab_reason")
-    private String cotVocabReason;
+    @JsonProperty("cot_fact_ratio_reason")
+    private String cotFactRatioReason;
 
-    @JsonProperty("cot_framing_reason")
-    private String cotFramingReason;
+    @JsonProperty("fact_check_results")
+    private List<FactCheckItem> factCheckResults;
 
-    @JsonProperty("cot_citation_reason")
-    private String cotCitationReason;
+    @Getter
+    @NoArgsConstructor
+    public static class FactCheckItem {
+        @JsonProperty("fact")
+        private String fact;
 
-    @JsonProperty("cot_omission_reason")
-    private String cotOmissionReason;
+        @JsonProperty("found")
+        private Boolean found;
 
-    @JsonProperty("highlighted_sentences")
-    private List<HighlightedSentence> highlightedSentences;
+        @JsonProperty("rating")
+        private String rating;
 
-    @JsonProperty("sections")
-    private List<SectionResult> sections;
+        @JsonProperty("score")
+        private Double score;
 
-    // ── 섹션별 편향 (CoT 3단계 포함) ──────────────────────────────────────
+        @JsonProperty("title")
+        private String title;
+
+        @JsonProperty("publisher")
+        private String publisher;
+
+        @JsonProperty("url")
+        private String url;
+    }
+
     @Getter
     @NoArgsConstructor
     public static class SectionResult {
@@ -121,7 +120,6 @@ public class AiCallbackRequest {
         private String reason;
     }
 
-    // ── 하이라이팅 문장 ────────────────────────────────────────────────────
     @Getter
     @NoArgsConstructor
     public static class HighlightedSentence {
@@ -133,6 +131,8 @@ public class AiCallbackRequest {
 
         @JsonProperty("score")
         private Double score;
-    }
 
+        @JsonProperty("reason")
+        private String reason;
+    }
 }

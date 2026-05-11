@@ -22,6 +22,8 @@ spring:
 ai:
   server:
     url: ${AI_ENGINE_URL:http://ai-engine:5000}
+  youtube:
+    analysis-url: ${YOUTUBE_AI_ANALYSIS_URL:http://youtube-ai:8000/analyze/youtube}
 
 ocr:
   tessdata-path: /usr/share/tesseract-ocr/4.00/tessdata
