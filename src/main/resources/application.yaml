@@ -18,8 +18,8 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
+      max-file-size: 50MB
+      max-request-size: 50MB
 
 server:
   port: 8080
@@ -43,6 +43,11 @@ clova:
 youtube:
   api:
     key: ${YOUTUBE_API_KEY:}
+
+naver:
+  api:
+    client-id: ${NAVER_CLIENT_ID:}
+    client-secret: ${NAVER_CLIENT_SECRET:}
 
 ai:
   server:

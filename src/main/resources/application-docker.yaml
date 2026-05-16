@@ -16,12 +16,14 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
+      max-file-size: 50MB
+      max-request-size: 50MB
 
 ai:
   server:
     url: ${AI_ENGINE_URL:http://ai-engine:5000}
+  youtube:
+    analysis-url: ${YOUTUBE_AI_ANALYSIS_URL:http://youtube-ai:8000/analyze/youtube}
 
 ocr:
   tessdata-path: /usr/share/tesseract-ocr/4.00/tessdata
@@ -35,3 +37,8 @@ clova:
 youtube:
   api:
     key: ${YOUTUBE_API_KEY:}
+
+naver:
+  api:
+    client-id: ${NAVER_CLIENT_ID:}
+    client-secret: ${NAVER_CLIENT_SECRET:}

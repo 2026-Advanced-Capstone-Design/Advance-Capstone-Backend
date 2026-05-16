@@ -50,7 +50,7 @@ Content-Type: application/json
 
 ```json
 {
-  "youtubeUrl": "https://www.youtube.com/watch?v=Avt_ySKe3fE"
+  "youtubeUrl": "https://www.youtube.com/watch?v=jjdmX3GPdeQ"
 }
 ```
 
@@ -61,7 +61,7 @@ Content-Type: application/json
   "success": true,
   "data": {
     "requestId": "50afbb15-0788-477c-807b-fcd09b350116",
-    "youtubeId": "Avt_ySKe3fE",
+    "youtubeId": "jjdmX3GPdeQ",
     "status": "PENDING"
   },
   "message": "분석 요청이 접수되었습니다."
@@ -70,7 +70,7 @@ Content-Type: application/json
 
 ### URL 오류 응답 예시
 
-유튜브 URL이 아니거나 videoId를 추출할 수 없는 경우입니다.
+유효하지 않은 유튜브 URL이거나 `videoId`를 추출할 수 없는 경우입니다.
 
 ```json
 {
@@ -121,7 +121,7 @@ GET /api/youtube/analysis/50afbb15-0788-477c-807b-fcd09b350116
   "success": true,
   "data": {
     "requestId": "50afbb15-0788-477c-807b-fcd09b350116",
-    "youtubeId": "Avt_ySKe3fE",
+    "youtubeId": "jjdmX3GPdeQ",
     "status": "PROCESSING",
     "result": null,
     "errorMessage": null
@@ -138,44 +138,47 @@ GET /api/youtube/analysis/50afbb15-0788-477c-807b-fcd09b350116
 {
   "success": true,
   "data": {
-    "requestId": "50afbb15-0788-477c-807b-fcd09b350116",
-    "youtubeId": "Avt_ySKe3fE",
+    "requestId": "f2f4473c-d6d6-48a9-91c7-3de0d5bf735c",
+    "youtubeId": "jjdmX3GPdeQ",
     "status": "COMPLETED",
     "result": {
-      "videoTitle": "6년만에 나온 애플 에어팟 맥스 2세대.. 진짜 달라진 거 맞아요?",
-      "channelName": "ITSub잇섭",
-      "viewCount": 424586,
-      "publishedAt": "2026-03-31",
-      "videoCommentCount": "820",
-      "total": 100,
-      "positive": 47,
-      "negative": 30,
-      "neutral": 23,
-      "positivePct": 47.0,
-      "negativePct": 30.0,
-      "neutralPct": 23.0,
-      "botCount": 2,
-      "botPct": 2.0,
-      "summary": "전반적 여론 요약",
+      "videoTitle": "체스오프닝 12분 입문가이드 [킹즈갬빗 King’s Gambit] 용기있는 자들을 위한 양날의 검",
+      "channelName": "체스프릭김창훈",
+      "viewCount": 29804,
+      "publishedAt": "2024-10-20",
+      "videoCommentCount": "46",
+      "total": 41,
+      "positive": 32,
+      "negative": 0,
+      "neutral": 9,
+      "positivePct": 78,
+      "negativePct": 0,
+      "neutralPct": 22,
+      "botCount": 0,
+      "botPct": 0,
+      "positiveSummary": "긍정 댓글들은 킹즈갬빗과 관련된 매력과 짜릿함을 강조하고 있습니다.",
+      "negativeSummary": "부정 댓글 없음",
+      "neutralSummary": "중립 댓글들은 주로 영상의 내용에 대한 피드백을 제공하고 있습니다.",
+      "specialNotes": "없음",
       "comments": [
         {
-          "text": "충격적인 인트로 ㅋㅋㅋㅋㅋㅋ",
-          "likes": 712,
-          "authorName": "@콩_ẞeans",
-          "authorId": "UConUZw1hmZkcM17XhMtn3_w",
-          "sentiment": "긍정",
-          "sentimentScore": 0.95,
+          "text": "영상에 오타가 있습니다😅",
+          "likes": 15,
+          "authorName": "@chessfreak",
+          "authorId": "UCO5rDIUWfCX7gsCzURXMUCg",
+          "sentiment": "중립",
+          "sentimentScore": 0.85,
           "botScore": 0,
           "isBot": false,
           "botReasons": []
         },
         {
-          "text": "영상 요약: 차이 없다",
-          "likes": 475,
-          "authorName": "@파란하늘-g3e",
-          "authorId": "UCmz57WLTWfPWByuGOZJMgBA",
-          "sentiment": "중립",
-          "sentimentScore": 0.8,
+          "text": "서로 킹을 갬빗해서 킹즈갬빗인거군요!",
+          "likes": 33,
+          "authorName": "@spicca4601",
+          "authorId": "UC_gKDl1llqCPbENKMvQL1ZQ",
+          "sentiment": "긍정",
+          "sentimentScore": 0.9,
           "botScore": 0,
           "isBot": false,
           "botReasons": []
@@ -197,7 +200,7 @@ GET /api/youtube/analysis/50afbb15-0788-477c-807b-fcd09b350116
   "success": true,
   "data": {
     "requestId": "50afbb15-0788-477c-807b-fcd09b350116",
-    "youtubeId": "Avt_ySKe3fE",
+    "youtubeId": "jjdmX3GPdeQ",
     "status": "FAILED",
     "result": null,
     "errorMessage": "AI 서버에 분석 요청을 보내지 못했습니다. 잠시 후 다시 시도해주세요."
@@ -239,7 +242,7 @@ GET /api/youtube/analysis/50afbb15-0788-477c-807b-fcd09b350116
 GET {YOUTUBE_AI_ANALYSIS_URL}/{videoId}
 ```
 
-현재 기본 설정값:
+로컬 개발 예시:
 
 ```text
 http://localhost:8000/analyze/youtube
@@ -248,5 +251,5 @@ http://localhost:8000/analyze/youtube
 예시:
 
 ```http
-GET http://localhost:8000/analyze/youtube/Avt_ySKe3fE
+GET http://localhost:8000/analyze/youtube/jjdmX3GPdeQ
 ```

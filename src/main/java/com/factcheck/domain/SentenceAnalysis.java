@@ -35,18 +35,16 @@ public class SentenceAnalysis {
     @Column(name = "emotion_score")
     private Float emotionScore;
 
-    @Column(name = "bias_score")
-    private Float biasScore;
+    @Column(name = "highlight_score")
+    private Float highlightScore;
 
-    //하이라이트 대상인지 여부를 나타내는 문장(true인 문장만 강조)
-    @Column(name = "is_highlighted")
-    private Boolean isHighlighted;
+    // fact | emotion | section_bias
+    @Column(name = "highlight_type", length = 30)
+    private String highlightType;
 
-    // 왜 주못을 해야 되는지
     @Column(name = "highlight_reason", columnDefinition = "TEXT")
     private String highlightReason;
 
-    // 어떤 단어에 색을 칠할것인가...?
     @Column
     private String highlight_details;
 
@@ -61,16 +59,16 @@ public class SentenceAnalysis {
 
     @Builder
     public SentenceAnalysis(Integer sentenceIndex, String sentenceText, FactOrOpinion factOrOpinion,
-                            Float factConfidence, Float emotionScore, Float biasScore,
-                            Boolean isHighlighted, String highlightReason,
+                            Float factConfidence, Float emotionScore, Float highlightScore,
+                            String highlightType, String highlightReason,
                             AnalysisResult analysisResult, Article article) {
         this.sentenceIndex = sentenceIndex;
         this.sentenceText = sentenceText;
         this.factOrOpinion = factOrOpinion;
         this.factConfidence = factConfidence;
         this.emotionScore = emotionScore;
-        this.biasScore = biasScore;
-        this.isHighlighted = isHighlighted;
+        this.highlightScore = highlightScore;
+        this.highlightType = highlightType;
         this.highlightReason = highlightReason;
         this.analysisResult = analysisResult;
         this.article = article;

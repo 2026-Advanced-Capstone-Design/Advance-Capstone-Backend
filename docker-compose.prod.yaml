@@ -29,6 +29,8 @@ services:
       AI_ENGINE_URL: http://ai-engine:5000
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY}
       YOUTUBE_AI_ANALYSIS_URL: http://youtube-ai:8000/analyze/youtube
+      NAVER_CLIENT_ID: ${NAVER_CLIENT_ID}
+      NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET}
     ports:
       - "8080:8080"
     depends_on:
