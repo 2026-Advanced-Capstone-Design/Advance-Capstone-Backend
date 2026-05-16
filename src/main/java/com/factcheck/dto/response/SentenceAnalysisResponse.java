@@ -23,8 +23,8 @@ public class SentenceAnalysisResponse {
         this.factOrOpinion    = s.getFactOrOpinion();
         this.factConfidence   = s.getFactConfidence();
         this.emotionScore     = s.getEmotionScore();
-        this.biasScore        = s.getBiasScore();
-        this.isHighlighted    = s.getIsHighlighted();
+        this.biasScore        = s.getHighlightScore();
+        this.isHighlighted    = s.getHighlightType() != null;
         this.highlightReason  = s.getHighlightReason();
         this.highlightDetails = s.getHighlight_details();
     }
