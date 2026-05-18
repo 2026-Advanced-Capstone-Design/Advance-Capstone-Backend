@@ -1,11 +1,17 @@
 package com.factcheck.service;
 
 import com.factcheck.Enum.ArticleStatus;
-import com.factcheck.domain.*;
+import com.factcheck.domain.AnalysisResult;
+import com.factcheck.domain.AnalysisSection;
+import com.factcheck.domain.Article;
+import com.factcheck.domain.SentenceAnalysis;
 import com.factcheck.dto.request.AiCallbackRequest;
 import com.factcheck.global.exception.BusinessException;
 import com.factcheck.global.exception.ErrorCode;
-import com.factcheck.repository.*;
+import com.factcheck.repository.AnalysisResultRepository;
+import com.factcheck.repository.AnalysisSectionRepository;
+import com.factcheck.repository.ArticleRepository;
+import com.factcheck.repository.SentenceAnalysisRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +30,6 @@ public class AnalysisCallbackService {
     private final AnalysisResultRepository analysisResultRepository;
     private final AnalysisSectionRepository analysisSectionRepository;
     private final SentenceAnalysisRepository sentenceAnalysisRepository;
-    private final FactCheckResultRepository factCheckResultRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional
@@ -44,16 +49,15 @@ public class AnalysisCallbackService {
                 .compressedText(req.getCompressedText())
                 .keywords(toJson(req.getKeywords()))
                 .factRatioSource(toFloat(req.getFactRatioSource()))
+                .factCheckReason(req.getFactCheckReason())
                 .biasLabel(req.getBiasLabel())
                 .biasConfidence(toFloat(req.getBiasConfidence()))
                 .biasReason(req.getBiasReason())
-                .biasDirection(req.getBiasDirection())
                 .emotionNeutrality(toFloat(req.getEmotionNeutrality()))
                 .factRatio(toFloat(req.getFactRatio()))
                 .biasScore(toFloat(req.getBiasScore()))
                 .totalScore(req.getTotalScore())
                 .cotEmotionReason(req.getCotEmotionReason())
-                .cotFactRatioReason(req.getCotFactRatioReason())
                 .build();
 
         analysisResultRepository.save(result);
@@ -87,23 +91,6 @@ public class AnalysisCallbackService {
                         .highlightScore(toFloat(hs.getScore()))
                         .build();
                 sentenceAnalysisRepository.save(sentence);
-            }
-        }
-
-        List<AiCallbackRequest.FactCheckItem> factChecks = req.getFactCheckResults();
-        if (factChecks != null) {
-            for (AiCallbackRequest.FactCheckItem fc : factChecks) {
-                FactCheckResult factCheck = FactCheckResult.builder()
-                        .analysisResult(result)
-                        .fact(fc.getFact())
-                        .found(fc.getFound())
-                        .rating(fc.getRating())
-                        .score(fc.getScore() != null ? fc.getScore().floatValue() : null)
-                        .title(fc.getTitle())
-                        .publisher(fc.getPublisher())
-                        .url(fc.getUrl())
-                        .build();
-                factCheckResultRepository.save(factCheck);
             }
         }
 

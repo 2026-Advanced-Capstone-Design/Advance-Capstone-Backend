@@ -1,6 +1,7 @@
 package com.factcheck.global.exception;
 
 import com.factcheck.common.response.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestControllerAdvice
 @RequestMapping(produces = MediaType.APPLICATION_JSON_VALUE)
 public class GlobalExceptionHandler {
@@ -49,6 +51,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Map<String, Object>>> handleException(Exception e) {
+        log.error("Unhandled exception: {}", e.getMessage(), e);
         Map<String, Object> body = new HashMap<>();
         body.put("code", ErrorCode.INTERNAL_SERVER_ERROR.getCode());
         body.put("message", ErrorCode.INTERNAL_SERVER_ERROR.getMessage());

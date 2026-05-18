@@ -36,6 +36,9 @@ public class AnalysisResult {
     @Column(name = "fact_ratio_source")
     private Float factRatioSource;
 
+    @Column(name = "fact_check_reason", columnDefinition = "TEXT")
+    private String factCheckReason;
+
     @Column(name = "bias_label", length = 50)
     private String biasLabel;
 
@@ -44,9 +47,6 @@ public class AnalysisResult {
 
     @Column(name = "bias_reason", columnDefinition = "TEXT")
     private String biasReason;
-
-    @Column(name = "bias_direction", length = 20)
-    private String biasDirection;
 
     @Column(name = "emotion_neutrality")
     private Float emotionNeutrality;
@@ -63,9 +63,6 @@ public class AnalysisResult {
     @Column(name = "cot_emotion_reason", columnDefinition = "TEXT")
     private String cotEmotionReason;
 
-    @Column(name = "cot_fact_ratio_reason", columnDefinition = "TEXT")
-    private String cotFactRatioReason;
-
     @Column(name = "analyzed_at")
     private LocalDateTime analyzedAt;
 
@@ -75,31 +72,27 @@ public class AnalysisResult {
     @OneToMany(mappedBy = "analysisResult", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SentenceAnalysis> sentences = new ArrayList<>();
 
-    @OneToMany(mappedBy = "analysisResult", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<FactCheckResult> factCheckResults = new ArrayList<>();
-
     @Builder
     public AnalysisResult(Article article, String title, String compressedText,
-                          String keywords,
-                          Float factRatioSource, String biasLabel, Float biasConfidence,
-                          String biasReason, String biasDirection, Float emotionNeutrality,
+                          String keywords, Float factRatioSource, String factCheckReason,
+                          String biasLabel, Float biasConfidence,
+                          String biasReason, Float emotionNeutrality,
                           Float factRatio, Float biasScore, Integer totalScore,
-                          String cotEmotionReason, String cotFactRatioReason) {
+                          String cotEmotionReason) {
         this.article = article;
         this.title = title;
         this.compressedText = compressedText;
         this.keywords = keywords;
         this.factRatioSource = factRatioSource;
+        this.factCheckReason = factCheckReason;
         this.biasLabel = biasLabel;
         this.biasConfidence = biasConfidence;
         this.biasReason = biasReason;
-        this.biasDirection = biasDirection;
         this.emotionNeutrality = emotionNeutrality;
         this.factRatio = factRatio;
         this.biasScore = biasScore;
         this.totalScore = totalScore;
         this.cotEmotionReason = cotEmotionReason;
-        this.cotFactRatioReason = cotFactRatioReason;
         this.analyzedAt = LocalDateTime.now();
     }
 }
