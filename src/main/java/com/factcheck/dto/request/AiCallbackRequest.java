@@ -43,9 +43,6 @@ public class AiCallbackRequest {
     @JsonProperty("highlighted_sentences")
     private List<HighlightedSentence> highlightedSentences;
 
-    @JsonProperty("bias_direction")
-    private String biasDirection;
-
     @JsonProperty("emotion_neutrality")
     private Double emotionNeutrality;
 
@@ -55,6 +52,9 @@ public class AiCallbackRequest {
     @JsonProperty("fact_ratio_source")
     private Double factRatioSource;
 
+    @JsonProperty("fact_check_reason")
+    private String factCheckReason;
+
     @JsonProperty("bias_score")
     private Double biasScore;
 
@@ -63,37 +63,6 @@ public class AiCallbackRequest {
 
     @JsonProperty("cot_emotion_reason")
     private String cotEmotionReason;
-
-    @JsonProperty("cot_fact_ratio_reason")
-    private String cotFactRatioReason;
-
-    @JsonProperty("fact_check_results")
-    private List<FactCheckItem> factCheckResults;
-
-    @Getter
-    @NoArgsConstructor
-    public static class FactCheckItem {
-        @JsonProperty("fact")
-        private String fact;
-
-        @JsonProperty("found")
-        private Boolean found;
-
-        @JsonProperty("rating")
-        private String rating;
-
-        @JsonProperty("score")
-        private Double score;
-
-        @JsonProperty("title")
-        private String title;
-
-        @JsonProperty("publisher")
-        private String publisher;
-
-        @JsonProperty("url")
-        private String url;
-    }
 
     @Getter
     @NoArgsConstructor

@@ -16,10 +16,12 @@ public class AnalysisSection {
     @Column(name = "SECTION_ID")
     private Long id;
 
+    // result와의 mapping
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "RESULT_ID")
     private AnalysisResult analysisResult;
 
+    // section의 대한 주제
     @Column(name = "topic", length = 20)
     private String topic;
 
@@ -29,9 +31,10 @@ public class AnalysisSection {
     @Column(name = "confidence")
     private Float confidence;
 
+    // 섹션 사유
     @Column(name = "reason", columnDefinition = "TEXT")
     private String reason;
-
+    
     @Column(name = "step1_biased_expressions", columnDefinition = "JSON")
     private String step1BiasedExpressions;
 
