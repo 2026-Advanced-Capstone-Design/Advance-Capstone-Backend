@@ -57,6 +57,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       CHROMA_PERSIST_DIR: /app/chroma_db
       SPRING_CALLBACK_URL: http://backend:8080/api/v1/internal/callback
+      MOCK_MODE: ${MOCK_MODE:-false}
     ports:
       - "5000:5000"
     volumes:
