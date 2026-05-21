@@ -19,8 +19,8 @@ public class AiCallbackRequest {
     @JsonProperty("error")
     private String error;
 
-    @JsonProperty("compressed_text")
-    private String compressedText;
+    @JsonProperty("key_facts")
+    private List<String> keyFacts;
 
     @JsonProperty("keywords")
     private List<String> keywords;
@@ -48,9 +48,6 @@ public class AiCallbackRequest {
 
     @JsonProperty("fact_ratio")
     private Double factRatio;
-
-    @JsonProperty("fact_ratio_source")
-    private Double factRatioSource;
 
     @JsonProperty("fact_check_reason")
     private String factCheckReason;

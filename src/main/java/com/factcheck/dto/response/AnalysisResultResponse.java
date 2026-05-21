@@ -14,9 +14,10 @@ import java.util.List;
 public class AnalysisResultResponse {
 
     private Long articleId;
+    private String articleTitle;
+    private String originalText;
     private Long resultId;
     private Integer totalScore;
-    private String compressedText;
     private Indicators indicators;
     private BiasInfo bias;
     private SummaryInfo summary;
@@ -27,9 +28,10 @@ public class AnalysisResultResponse {
 
     public AnalysisResultResponse(AnalysisResult result) {
         this.articleId    = result.getArticle().getId();
+        this.articleTitle = result.getArticle().getTitle();
+        this.originalText = result.getArticle().getOriginalText();
         this.resultId     = result.getId();
         this.totalScore   = result.getTotalScore();
-        this.compressedText = result.getCompressedText();
         this.indicators   = new Indicators(result);
         this.bias         = new BiasInfo(result);
         this.summary      = new SummaryInfo(result);
@@ -43,27 +45,27 @@ public class AnalysisResultResponse {
     public static class Indicators {
         private Float factRatio;
         private Float emotionNeutrality;
-        private Float omissionNeutrality;
         private Float biasScore;
         private String factCheckReason;
 
         public Indicators(AnalysisResult r) {
-            this.factRatio          = r.getFactRatio();
-            this.emotionNeutrality  = r.getEmotionNeutrality();
-            this.omissionNeutrality = null;
-            this.biasScore          = r.getBiasScore();
-            this.factCheckReason    = r.getFactCheckReason();
+            this.factRatio         = r.getFactRatio();
+            this.emotionNeutrality = r.getEmotionNeutrality();
+            this.biasScore         = r.getBiasScore();
+            this.factCheckReason   = r.getFactCheckReason();
         }
     }
 
     @Getter
     public static class BiasInfo {
         private String biasLabel;
+        private Float biasConfidence;
         private String biasReason;
 
         public BiasInfo(AnalysisResult r) {
-            this.biasLabel  = r.getBiasLabel();
-            this.biasReason = r.getBiasReason();
+            this.biasLabel      = r.getBiasLabel();
+            this.biasConfidence = r.getBiasConfidence();
+            this.biasReason     = r.getBiasReason();
         }
     }
 
@@ -73,13 +75,15 @@ public class AnalysisResultResponse {
 
         private String title;
         private List<String> keywords;
+        private List<String> keyFacts;
 
         public SummaryInfo(AnalysisResult r) {
             this.title    = r.getTitle();
-            this.keywords = parseKeywords(r.getKeywords());
+            this.keywords = parseList(r.getKeywords());
+            this.keyFacts = parseList(r.getKeyFacts());
         }
 
-        private static List<String> parseKeywords(String json) {
+        private static List<String> parseList(String json) {
             if (json == null || json.isBlank()) return List.of();
             try {
                 return MAPPER.readValue(json, new TypeReference<List<String>>() {});
@@ -100,16 +104,33 @@ public class AnalysisResultResponse {
 
     @Getter
     public static class SectionInfo {
+        private static final ObjectMapper MAPPER = new ObjectMapper();
+
         private String topic;
         private String biasLabel;
         private Float confidence;
         private String reason;
+        private List<String> step1BiasedExpressions;
+        private List<String> step2NeutralExpressions;
+        private String step3Judgment;
 
         public SectionInfo(AnalysisSection s) {
-            this.topic      = s.getTopic();
-            this.biasLabel  = s.getBiasLabel();
-            this.confidence = s.getConfidence();
-            this.reason     = s.getReason();
+            this.topic                  = s.getTopic();
+            this.biasLabel              = s.getBiasLabel();
+            this.confidence             = s.getConfidence();
+            this.reason                 = s.getReason();
+            this.step1BiasedExpressions = parseList(s.getStep1BiasedExpressions());
+            this.step2NeutralExpressions = parseList(s.getStep2NeutralExpressions());
+            this.step3Judgment          = s.getStep3Judgment();
+        }
+
+        private static List<String> parseList(String json) {
+            if (json == null || json.isBlank()) return List.of();
+            try {
+                return MAPPER.readValue(json, new TypeReference<List<String>>() {});
+            } catch (Exception e) {
+                return List.of();
+            }
         }
     }
 
@@ -127,5 +148,4 @@ public class AnalysisResultResponse {
             this.highlightScore  = s.getHighlightScore();
         }
     }
-
 }

@@ -27,14 +27,11 @@ public class AnalysisResult {
     @Column(name = "title", columnDefinition = "TEXT")
     private String title;
 
-    @Column(name = "compressed_text", columnDefinition = "TEXT")
-    private String compressedText;
+    @Column(name = "key_facts", columnDefinition = "JSON")
+    private String keyFacts;
 
     @Column(name = "keywords", columnDefinition = "JSON")
     private String keywords;
-
-    @Column(name = "fact_ratio_source")
-    private Float factRatioSource;
 
     @Column(name = "fact_check_reason", columnDefinition = "TEXT")
     private String factCheckReason;
@@ -73,17 +70,16 @@ public class AnalysisResult {
     private List<SentenceAnalysis> sentences = new ArrayList<>();
 
     @Builder
-    public AnalysisResult(Article article, String title, String compressedText,
-                          String keywords, Float factRatioSource, String factCheckReason,
+    public AnalysisResult(Article article, String title, String keyFacts,
+                          String keywords, String factCheckReason,
                           String biasLabel, Float biasConfidence,
                           String biasReason, Float emotionNeutrality,
                           Float factRatio, Float biasScore, Integer totalScore,
                           String cotEmotionReason) {
         this.article = article;
         this.title = title;
-        this.compressedText = compressedText;
+        this.keyFacts = keyFacts;
         this.keywords = keywords;
-        this.factRatioSource = factRatioSource;
         this.factCheckReason = factCheckReason;
         this.biasLabel = biasLabel;
         this.biasConfidence = biasConfidence;
