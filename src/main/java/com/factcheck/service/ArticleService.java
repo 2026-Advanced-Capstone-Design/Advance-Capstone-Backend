@@ -7,6 +7,7 @@ import com.factcheck.dto.request.UrlRequest;
 import com.factcheck.dto.response.AnalyzeResponse;
 import com.factcheck.dto.response.AnalysisResultResponse;
 import com.factcheck.dto.response.AnalysisStatusResponse;
+import com.factcheck.dto.response.LatestArticleIdResponse;
 import com.factcheck.global.exception.BusinessException;
 import com.factcheck.global.exception.ErrorCode;
 import com.factcheck.repository.AnalysisCacheRepository;
@@ -59,6 +60,12 @@ public class ArticleService {
 
         return analysisResultRepository.findByArticleId(articleId)
                 .map(AnalysisResultResponse::new)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESULT_NOT_FOUND));
+    }
+
+    public LatestArticleIdResponse getLatestAnalyzedArticleId() {
+        return analysisResultRepository.findTopByOrderByIdDesc()
+                .map(result -> new LatestArticleIdResponse(result.getArticle().getId()))
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESULT_NOT_FOUND));
     }
 

@@ -6,6 +6,7 @@ import com.factcheck.dto.request.UrlRequest;
 import com.factcheck.dto.response.AnalyzeResponse;
 import com.factcheck.dto.response.AnalysisResultResponse;
 import com.factcheck.dto.response.AnalysisStatusResponse;
+import com.factcheck.dto.response.LatestArticleIdResponse;
 import com.factcheck.dto.response.RelatedArticleResponse;
 import com.factcheck.service.ArticleService;
 import com.factcheck.service.NaverNewsService;
@@ -84,6 +85,16 @@ public class ArticleController {
             @PathVariable Long id) {
         AnalysisResultResponse response = articleService.getResult(id);
         return ResponseEntity.ok(ApiResponse.ok(response, "분석 결과 조회 성공"));
+    }
+
+    /**
+     * 최신 분석 결과에 연결된 기사 ID 조회
+     * GET /api/v1/articles/results/latest/article-id
+     */
+    @GetMapping("/results/latest/article-id")
+    public ResponseEntity<ApiResponse<LatestArticleIdResponse>> getLatestAnalyzedArticleId() {
+        LatestArticleIdResponse response = articleService.getLatestAnalyzedArticleId();
+        return ResponseEntity.ok(ApiResponse.ok(response, "최신 분석 기사 ID 조회 성공"));
     }
 
     /**
