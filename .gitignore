@@ -40,7 +40,7 @@ out/
 *.pem
 *.key
 .env
-.env.prod
+.env.*
 application-local.yaml
 
 ### Separate repos ###

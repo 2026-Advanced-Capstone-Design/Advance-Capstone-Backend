@@ -62,35 +62,35 @@ public class AnalysisCallbackService {
         analysisResultRepository.save(result);
 
         List<AiCallbackRequest.SectionResult> sections = req.getSections();
-        if (sections != null) {
-            for (AiCallbackRequest.SectionResult sec : sections) {
-                AnalysisSection section = AnalysisSection.builder()
-                        .analysisResult(result)
-                        .topic(sec.getTopic())
-                        .biasLabel(sec.getBiasLabel())
-                        .confidence(toFloat(sec.getConfidence()))
-                        .reason(sec.getReason())
-                        .step1BiasedExpressions(toJson(sec.getStep1BiasedExpressions()))
-                        .step2NeutralExpressions(toJson(sec.getStep2NeutralExpressions()))
-                        .step3Judgment(sec.getStep3Judgment())
-                        .build();
-                analysisSectionRepository.save(section);
-            }
+        if (sections != null && !sections.isEmpty()) {
+            List<AnalysisSection> sectionEntities = sections.stream()
+                    .map(sec -> AnalysisSection.builder()
+                            .analysisResult(result)
+                            .topic(sec.getTopic())
+                            .biasLabel(sec.getBiasLabel())
+                            .confidence(toFloat(sec.getConfidence()))
+                            .reason(sec.getReason())
+                            .step1BiasedExpressions(toJson(sec.getStep1BiasedExpressions()))
+                            .step2NeutralExpressions(toJson(sec.getStep2NeutralExpressions()))
+                            .step3Judgment(sec.getStep3Judgment())
+                            .build())
+                    .toList();
+            analysisSectionRepository.saveAll(sectionEntities);
         }
 
         List<AiCallbackRequest.HighlightedSentence> highlighted = req.getHighlightedSentences();
-        if (highlighted != null) {
-            for (AiCallbackRequest.HighlightedSentence hs : highlighted) {
-                SentenceAnalysis sentence = SentenceAnalysis.builder()
-                        .analysisResult(result)
-                        .article(article)
-                        .sentenceText(hs.getSentence())
-                        .highlightType(hs.getType())
-                        .highlightReason(hs.getReason())
-                        .highlightScore(toFloat(hs.getScore()))
-                        .build();
-                sentenceAnalysisRepository.save(sentence);
-            }
+        if (highlighted != null && !highlighted.isEmpty()) {
+            List<SentenceAnalysis> sentenceEntities = highlighted.stream()
+                    .map(hs -> SentenceAnalysis.builder()
+                            .analysisResult(result)
+                            .article(article)
+                            .sentenceText(hs.getSentence())
+                            .highlightType(hs.getType())
+                            .highlightReason(hs.getReason())
+                            .highlightScore(toFloat(hs.getScore()))
+                            .build())
+                    .toList();
+            sentenceAnalysisRepository.saveAll(sentenceEntities);
         }
 
         article.updateStatus(ArticleStatus.DONE);
