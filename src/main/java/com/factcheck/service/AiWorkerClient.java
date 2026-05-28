@@ -62,9 +62,7 @@ public class AiWorkerClient {
     }
 
     private void updateStatus(Article article, ArticleStatus status) {
-        articleRepository.findById(article.getId()).ifPresent(a -> {
-            a.updateStatus(status);
-            articleRepository.save(a);
-        });
+        article.updateStatus(status);
+        articleRepository.save(article);
     }
 }
