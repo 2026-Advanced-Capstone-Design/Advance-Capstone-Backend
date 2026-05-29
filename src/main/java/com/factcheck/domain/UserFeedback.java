@@ -1,5 +1,6 @@
 package com.factcheck.domain;
 
+import com.factcheck.feedback.domain.FeedbackType;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,8 +18,9 @@ public class UserFeedback {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "rating", nullable = false)
-    private Integer rating;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "feedback_type", nullable = false, length = 20)
+    private FeedbackType feedbackType;
 
     @Column(name = "comment", columnDefinition = "TEXT")
     private String comment;
@@ -45,9 +47,9 @@ public class UserFeedback {
     }
 
     @Builder
-    public UserFeedback(Integer rating, String comment,
+    public UserFeedback(FeedbackType feedbackType, String comment,
                         AnalysisResult analysisResult) {
-        this.rating = rating;
+        this.feedbackType = feedbackType;
         this.comment = comment;
         this.analysisResult = analysisResult;
     }
