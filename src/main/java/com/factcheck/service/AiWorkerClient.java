@@ -52,7 +52,9 @@ public class AiWorkerClient {
                     .retrieve()
                     .body(AiAnalyzeResponse.class);
 
-            log.info("AI 분석 요청 완료: articleId={}, taskId={}",
+            log.info("AI " +
+                            "" +
+                            "분석 요청 완료: articleId={}, taskId={}",
                     article.getId(), response != null ? response.getTaskId() : "null");
 
         } catch (RestClientException e) {
@@ -62,7 +64,6 @@ public class AiWorkerClient {
     }
 
     private void updateStatus(Article article, ArticleStatus status) {
-        article.updateStatus(status);
-        articleRepository.save(article);
+        articleRepository.updateStatus(article.getId(), status);
     }
 }
