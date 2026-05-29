@@ -12,7 +12,6 @@ public interface AnalysisResultRepository extends JpaRepository<AnalysisResult, 
     @Query("SELECT r FROM AnalysisResult r " +
            "JOIN FETCH r.article " +
            "LEFT JOIN FETCH r.sections " +
-           "LEFT JOIN FETCH r.sentences " +
            "WHERE r.article.id = :articleId")
     Optional<AnalysisResult> findByArticleId(@Param("articleId") Long articleId);
 }
