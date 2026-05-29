@@ -1,9 +1,9 @@
-package com.factcheck.feedback.controller;
+package com.factcheck.controller;
 
 import com.factcheck.common.response.ApiResponse;
-import com.factcheck.feedback.dto.FeedbackCreateRequest;
-import com.factcheck.feedback.dto.FeedbackResponse;
-import com.factcheck.feedback.service.FeedbackService;
+import com.factcheck.dto.request.FeedbackCreateRequest;
+import com.factcheck.dto.response.FeedbackResponse;
+import com.factcheck.service.FeedbackService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

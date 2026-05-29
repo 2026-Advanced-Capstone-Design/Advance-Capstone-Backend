@@ -1,10 +1,10 @@
-package com.factcheck.feedback.service;
+package com.factcheck.service;
 
 import com.factcheck.domain.AnalysisResult;
 import com.factcheck.domain.UserFeedback;
-import com.factcheck.feedback.dto.FeedbackCreateRequest;
-import com.factcheck.feedback.dto.FeedbackResponse;
-import com.factcheck.feedback.repository.FeedbackRepository;
+import com.factcheck.dto.request.FeedbackCreateRequest;
+import com.factcheck.dto.response.FeedbackResponse;
+import com.factcheck.repository.FeedbackRepository;
 import com.factcheck.global.exception.BusinessException;
 import com.factcheck.global.exception.ErrorCode;
 import com.factcheck.repository.AnalysisResultRepository;

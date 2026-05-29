@@ -1,6 +1,6 @@
-package com.factcheck.feedback.dto;
+package com.factcheck.dto.request;
 
-import com.factcheck.feedback.domain.FeedbackType;
+import com.factcheck.Enum.FeedbackType;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 

@@ -1,6 +1,6 @@
 package com.factcheck.domain;
 
-import com.factcheck.feedback.domain.FeedbackType;
+import com.factcheck.Enum.FeedbackType;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;

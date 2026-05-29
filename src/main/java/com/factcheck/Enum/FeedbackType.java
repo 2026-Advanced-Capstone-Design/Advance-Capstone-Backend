@@ -1,4 +1,4 @@
-package com.factcheck.feedback.domain;
+package com.factcheck.Enum;
 
 public enum FeedbackType {
     LIKE,

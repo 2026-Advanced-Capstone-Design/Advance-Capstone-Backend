@@ -1,6 +1,6 @@
-package com.factcheck.feedback.dto;
+package com.factcheck.dto.response;
 
-import com.factcheck.feedback.domain.FeedbackType;
+import com.factcheck.Enum.FeedbackType;
 
 public record FeedbackResponse(
         Long id,
