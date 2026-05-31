@@ -53,15 +53,15 @@ public class ArticleController {
     }
 
     /**
-     * 이미지 분석 요청
+     * 이미지 분석 요청 (다중 이미지 지원)
      * POST /api/v1/articles/analyze/image
      * Content-Type: multipart/form-data
-     * Form: image (파일)
+     * Form: image (파일 1개 이상, 같은 키 반복 전송)
      */
     @PostMapping(value = "/analyze/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<AnalyzeResponse>> analyzeImage(
-            @RequestParam("image") MultipartFile image) {
-        AnalyzeResponse response = articleService.submitImage(image);
+            @RequestParam("image") List<MultipartFile> images) {
+        AnalyzeResponse response = articleService.submitImage(images);
         return ResponseEntity.ok(ApiResponse.ok(response, "이미지 분석 요청이 접수되었습니다."));
     }
 

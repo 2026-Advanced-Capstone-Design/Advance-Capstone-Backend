@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -42,6 +43,7 @@ public class ArticleService {
 
     private final CrawlerService crawlerService;
     private final OcrService ocrService;
+    private final OcrAsyncService ocrAsyncService;
     private final PreprocessService preprocessService;
     private final AiWorkerClient aiWorkerClient;
 
@@ -120,34 +122,30 @@ public class ArticleService {
                 });
     }
 
-    @Transactional
-    public AnalyzeResponse submitImage(MultipartFile image) {
-        if (image == null || image.isEmpty()) {
+    public AnalyzeResponse submitImage(List<MultipartFile> images) {
+        if (images == null || images.isEmpty() || images.stream().allMatch(MultipartFile::isEmpty)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
-        String imagePath = saveImage(image);
 
-        String ocrText = "";
-        try {
-            ocrText = ocrService.extractText(image);
-            if (!ocrText.isBlank()) {
-                List<String> sentences = preprocessService.splitOnly(ocrText);
-                ocrText = String.join("\n", sentences);
-                log.info("OCR 완료: {} - {}자", image.getOriginalFilename(), ocrText.length());
-            } else {
-                log.warn("OCR 결과 없음: {}", image.getOriginalFilename());
-            }
-        } catch (IOException e) {
-            log.error("OCR 처리 실패: {}", e.getMessage());
-        }
+        List<java.io.File> savedFiles = images.stream()
+                .filter(img -> !img.isEmpty())
+                .map(img -> saveImage(img).toFile())
+                .toList();
 
-        Article article = Article.createFromImage(imagePath, ocrText);
-        articleRepository.save(article);
-        aiWorkerClient.submitAnalysis(article);
+        Article article = saveImageArticle(savedFiles.get(0).getPath());
+
+        ocrAsyncService.processOcrAsync(article.getId(), savedFiles);
+
         return new AnalyzeResponse(article);
     }
 
-    private String saveImage(MultipartFile image) {
+    @Transactional
+    protected Article saveImageArticle(String imagePath) {
+        Article article = Article.createFromImage(imagePath, "");
+        return articleRepository.save(article);
+    }
+
+    private Path saveImage(MultipartFile image) {
         try {
             Path uploadPath = Paths.get(IMAGE_UPLOAD_DIR).toAbsolutePath();
             if (!Files.exists(uploadPath)) {
@@ -162,7 +160,7 @@ public class ArticleService {
                 Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
             }
             log.info("이미지 저장 성공: {}", filePath);
-            return filePath.toString();
+            return filePath;
         } catch (IOException e) {
             log.error("이미지 저장 실패: dir={}, fileName={}, error={}",
                     IMAGE_UPLOAD_DIR, image.getOriginalFilename(), e.getMessage(), e);
