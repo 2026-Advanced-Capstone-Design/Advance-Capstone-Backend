@@ -35,30 +35,34 @@ public class OcrService {
     private final RestTemplate restTemplate = new RestTemplate();
 
     private static final int MIN_QUALITY_LENGTH = 50;
+    private static final double MIN_CONFIDENCE = 0.7;
 
     public String extractText(MultipartFile imageFile) throws IOException {
         File tempFile = File.createTempFile("ocr_", "_" + imageFile.getOriginalFilename());
         imageFile.transferTo(tempFile);
-
-        File pngFile = convertToPng(tempFile);
-        File processFile = pngFile != null ? pngFile : tempFile;
-
         try {
-            String tesseractResult = runTesseract(processFile);
-            log.info("Tesseract 결과 길이: {}", tesseractResult.length());
-
-            if (tesseractResult.trim().length() < MIN_QUALITY_LENGTH) {
-                log.info("Tesseract 품질 미흡, Clova OCR fallback 시도");
-                String clovaResult = runClovaOcr(processFile);
-                if (!clovaResult.isBlank()) {
-                    return clovaResult;
-                }
-            }
-
-            return tesseractResult;
-
+            return extractText(tempFile);
         } finally {
             tempFile.delete();
+        }
+    }
+
+    public String extractText(File imageFile) throws IOException {
+        File pngFile = convertToPng(imageFile);
+        File processFile = pngFile != null ? pngFile : imageFile;
+
+        try {
+            String clovaResult = runClovaOcr(processFile);
+            log.info("Clova OCR 결과 길이: {}", clovaResult.length());
+
+            if (!clovaResult.isBlank()) {
+                return clovaResult;
+            }
+
+            log.info("Clova OCR 결과 없음, Tesseract fallback 시도");
+            return runTesseract(processFile);
+
+        } finally {
             if (pngFile != null) pngFile.delete();
         }
     }
@@ -144,10 +148,19 @@ public class OcrService {
             if (fields == null) return "";
 
             StringBuilder sb = new StringBuilder();
+            int total = 0, filtered = 0;
             for (Map<String, Object> field : fields) {
                 String text = (String) field.get("inferText");
-                if (text != null) sb.append(text).append(" ");
+                if (text == null) continue;
+                total++;
+                double confidence = ((Number) field.getOrDefault("inferConfidence", 0.0)).doubleValue();
+                if (confidence >= MIN_CONFIDENCE) {
+                    sb.append(text).append(" ");
+                } else {
+                    filtered++;
+                }
             }
+            log.info("Clova OCR confidence 필터링: 전체 {}개 중 {}개 제거 (threshold={})", total, filtered, MIN_CONFIDENCE);
             return sb.toString().trim();
 
         } catch (Exception e) {

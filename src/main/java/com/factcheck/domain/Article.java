@@ -82,4 +82,8 @@ public class Article {
     public void updateStatus(ArticleStatus status) {
         this.status = status;
     }
+
+    public void updateOriginalText(String text) {
+        this.originalText = text;
+    }
 }
