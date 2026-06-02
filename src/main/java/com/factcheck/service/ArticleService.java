@@ -17,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -122,6 +124,7 @@ public class ArticleService {
                 });
     }
 
+    @Transactional
     public AnalyzeResponse submitImage(List<MultipartFile> images) {
         if (images == null || images.isEmpty() || images.stream().allMatch(MultipartFile::isEmpty)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
@@ -134,7 +137,13 @@ public class ArticleService {
 
         Article article = saveImageArticle(savedFiles.get(0).getPath());
 
-        ocrAsyncService.processOcrAsync(article.getId(), savedFiles);
+        Long articleId = article.getId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                ocrAsyncService.processOcrAsync(articleId, savedFiles);
+            }
+        });
 
         return new AnalyzeResponse(article);
     }
