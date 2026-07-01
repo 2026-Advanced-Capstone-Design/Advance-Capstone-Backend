@@ -39,6 +39,13 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-cache'
 	implementation 'com.github.ben-manes.caffeine:caffeine'
 
+	// Monitoring (Actuator + Prometheus) — Phase 1
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+
+	// 구조화 로깅(JSON) — Loki 수집용
+	implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
+
 
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.mysql:mysql-connector-j'

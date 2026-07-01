@@ -24,6 +24,29 @@ spring:
 server:
   port: 8080
 
+# Actuator / Prometheus (Phase 1 모니터링)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus, metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      # p95/p99 산출용 히스토그램 버킷 (Grafana에서 histogram_quantile 사용)
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 100ms, 300ms, 500ms, 1s, 3s, 5s, 10s
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
 # Swagger UI
 springdoc:
   swagger-ui:
