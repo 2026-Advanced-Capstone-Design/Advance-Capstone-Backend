@@ -18,7 +18,9 @@ public class CacheConfig {
         CaffeineCacheManager manager = new CaffeineCacheManager("relatedArticles");
         manager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(30, TimeUnit.MINUTES)
-                .maximumSize(1000));
+                .maximumSize(1000)
+                // 캐시 히트율 지표(cache.gets, cache.hits) 수집을 위해 통계 기록 활성화
+                .recordStats());
         return manager;
     }
 }

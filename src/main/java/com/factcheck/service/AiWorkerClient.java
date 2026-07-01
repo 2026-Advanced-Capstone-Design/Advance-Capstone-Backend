@@ -5,6 +5,8 @@ import com.factcheck.domain.Article;
 import com.factcheck.dto.request.AiAnalyzeRequest;
 import com.factcheck.dto.response.AiAnalyzeResponse;
 import com.factcheck.repository.ArticleRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Async;
@@ -19,11 +21,14 @@ public class AiWorkerClient {
 
     private final RestClient aiRestClient;
     private final ArticleRepository articleRepository;
+    private final MeterRegistry meterRegistry;
 
     public AiWorkerClient(@Qualifier("aiRestClient") RestClient aiRestClient,
-                          ArticleRepository articleRepository) {
+                          ArticleRepository articleRepository,
+                          MeterRegistry meterRegistry) {
         this.aiRestClient = aiRestClient;
         this.articleRepository = articleRepository;
+        this.meterRegistry = meterRegistry;
     }
 
     /**
@@ -43,6 +48,9 @@ public class AiWorkerClient {
                 .sourceUrl(article.getSourceUrl())
                 .build();
 
+        // AI 호출 지연시간 측정 (지표: ai.analyze.request, 태그 outcome=success|failure)
+        Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = "success";
         try {
             // 파일 호출이 아닌 HTTP 요청을 호촐 HTTP 로 통신 하는 내장 메서드
             // RestClient Config 참조
@@ -58,8 +66,15 @@ public class AiWorkerClient {
                     article.getId(), response != null ? response.getTaskId() : "null");
 
         } catch (RestClientException e) {
+            outcome = "failure";
             log.error("AI 서버 호출 실패: articleId={}, error={}", article.getId(), e.getMessage());
             updateStatus(article, ArticleStatus.FAILED);
+        } finally {
+            sample.stop(Timer.builder("ai.analyze.request")
+                    .description("Flask AI 엔진 /analyze 호출 지연시간")
+                    .tag("outcome", outcome)
+                    .publishPercentileHistogram()
+                    .register(meterRegistry));
         }
     }
 
