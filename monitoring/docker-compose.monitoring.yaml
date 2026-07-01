@@ -1,0 +1,128 @@
+# ============================================================
+# Phase 1 — 모니터링/로그 스택 (Prometheus + Grafana + Loki)
+# 앱 스택(docker-compose.prod.yaml)과 별도로 기동한다.
+# 앱 컨테이너(backend 등)를 스크랩하려면 같은 네트워크에 붙어야 하므로
+# 앱 스택의 newslens-network 를 external 네트워크로 참조한다.
+#
+# 기동:  docker compose -f monitoring/docker-compose.monitoring.yaml up -d
+# 접속:  Grafana http://<host>:3000  (admin / 아래 GF_SECURITY_ADMIN_PASSWORD)
+#
+# EC2 메모리 부담을 고려해 모든 컨테이너에 mem_limit 를 건다(총 ~1GB).
+# 소형 인스턴스라면 loki/promtail 을 빼고 지표만 먼저 돌리는 것도 방법.
+# ============================================================
+
+services:
+  # ---- 지표 수집 ----
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: newslens-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'   # 디스크 절약: 7일치만 보관
+      - '--storage.tsdb.path=/prometheus'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    mem_limit: 256m
+    networks:
+      - newslens-network
+
+  # ---- 시각화 대시보드 ----
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: newslens-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - loki
+    mem_limit: 256m
+    networks:
+      - newslens-network
+
+  # ---- 로그 저장소 ----
+  loki:
+    image: grafana/loki:3.1.0
+    container_name: newslens-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+    mem_limit: 256m
+    networks:
+      - newslens-network
+
+  # ---- 로그 수집기 (컨테이너 로그 → Loki) ----
+  promtail:
+    image: grafana/promtail:3.1.0
+    container_name: newslens-promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+    mem_limit: 128m
+    networks:
+      - newslens-network
+
+  # ---- 호스트 자원(메모리/CPU) 지표 ----
+  node-exporter:
+    image: prom/node-exporter:v1.8.1
+    container_name: newslens-node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - /:/host:ro,rslave
+    ports:
+      - "9100:9100"
+    mem_limit: 64m
+    networks:
+      - newslens-network
+
+  # ---- 컨테이너별 자원 지표 ----
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: newslens-cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8081:8080"
+    mem_limit: 128m
+    networks:
+      - newslens-network
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+
+# 앱 스택(docker-compose.prod.yaml)이 먼저 만든 네트워크를 재사용한다.
+# 앱을 먼저 up 해두거나, 없으면 아래 external:false 로 바꿔 단독 기동한다.
+networks:
+  newslens-network:
+    external: true

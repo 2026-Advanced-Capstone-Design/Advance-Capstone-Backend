@@ -1,0 +1,40 @@
+# Promtail — 도커 컨테이너 로그를 수집해 Loki로 전송한다.
+# docker service discovery 로 실행 중인 컨테이너를 자동 발견하고,
+# 컨테이너 이름/이미지 등을 라벨로 붙여 Grafana에서 서비스별 로그 필터가 가능하게 한다.
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 15s
+    relabel_configs:
+      # 컨테이너 이름을 container 라벨로
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      # 이미지 이름을 image 라벨로
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+      # 우리 앱/모니터링 컨테이너(newslens-*)만 수집
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/newslens-.*'
+        action: keep
+    pipeline_stages:
+      # JSON 로그(백엔드 docker 프로파일)면 level 을 라벨로 추출.
+      # traceId 는 요청마다 값이 달라 카디널리티가 매우 높으므로 라벨로 만들지 않는다.
+      # (Grafana에서 `{service="backend"} | json | traceId="abc123"` 로 필터)
+      - json:
+          expressions:
+            level: level
+      - labels:
+          level:

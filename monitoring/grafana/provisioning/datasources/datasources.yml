@@ -1,0 +1,19 @@
+# Grafana가 시작 시 자동으로 등록하는 데이터소스.
+# UI에서 수동으로 추가할 필요 없음. uid를 고정해 대시보드 JSON에서 참조한다.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: true
