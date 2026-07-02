@@ -1,0 +1,46 @@
+# 수동 대시보드용 최소 모니터링 스택 (Prometheus + Grafana만)
+# 앱 스택(newslens)이 만든 네트워크에 external 로 붙어서 backend 를 스크랩한다.
+#
+# 기동:  cd ~/monitoring-stack && docker-compose up -d
+# Grafana: http://<EC2-IP>:3000  (admin/admin)  ← 대시보드는 UI에서 직접 작성
+#
+# grafana-data 볼륨에 수동 작성 대시보드가 저장되어 재시작해도 유지된다.
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'
+    ports:
+      - "9090:9090"
+    mem_limit: 256m
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    mem_limit: 256m
+
+volumes:
+  prometheus-data:
+  grafana-data:
+
+# 앱 스택이 이미 만든 네트워크에 그대로 합류.
+# ⚠️ 이름이 다르면(newslens_newslens-network 가 아니면) 아래 name 을 수정해야 함.
+networks:
+  default:
+    name: newslens_newslens-network
+    external: true
