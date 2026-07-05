@@ -88,3 +88,50 @@
 #### 교훈
 - **`@Transactional`(및 `@Async`, `@Cacheable` 등 모든 프록시 기반 애노테이션)은 자기호출에서 무효다.** 별도 트랜잭션 경계가 필요하면 다른 빈 분리 / self-injection / `AopContext`를 써야 하고, 필요 없으면 애노테이션을 제거해 오해를 없애야 한다.
 - 이 감별은 **Phase 8**(트랜잭션 경계 축소)에서 `REQUIRES_NEW`로 상태 쓰기를 분리할 때 직접 재사용된다 — 거기선 반대로 "경계가 필요한" 경우라 별도 빈으로 뽑는다.
+
+---
+
+## 2026-07-05 — Phase 8: 외부 HTTP 호출을 트랜잭션 밖으로 (HikariCP 고갈 근본원인)
+
+### 사례 6 — HTTP 응답을 기다리는 내내 DB 커넥션을 물고 있던 트랜잭션
+
+#### 1) 문제 발견
+- 과거 부하 테스트에서 HikariCP가 반복적으로 고갈(`Connection is not available, request timed out`)돼 pool 크기를 30까지 올리며 튜닝했지만 근본 해결이 안 됐다. 2026-07-03 코드 감사에서 **진짜 원인**을 특정(문제 C).
+- 근거: `AiWorkerClient.submitAnalysis`(`@Async("aiWorkerExecutor")` + **`@Transactional`**)가 메서드 전체를 하나의 트랜잭션으로 감싼 채, 그 안에서 AI 엔진에 `/analyze` **HTTP 요청**을 보낸다.
+
+#### 2) 원인 분석
+- Spring 트랜잭션은 **시작 시 HikariCP 커넥션 1개를 획득해 커밋/롤백 전까지 반납하지 않는다.** `submitAnalysis`는 메서드 전체가 tx라 타임라인이 다음과 같았다:
+  ```
+  tx 시작 → 커넥션 획득 🔒
+    ① UPDATE status=ANALYZING   (수 ms, DB 작업)
+    ② AI /analyze HTTP 호출      (수 초, DB 작업 없음 — 그런데도 커넥션 점유)
+  tx 커밋 → 커넥션 반납 🔓
+  ```
+- ②번 HTTP 대기 구간엔 DB 작업이 전혀 없는데도 커넥션을 쥐고 있었다. `aiWorkerExecutor`가 최대 8스레드 → 부하 시 **8개 커넥션이 HTTP 응답만 기다리며** 장시간 점유 → 조회 요청(`getStatus`/`getResult`)이 커넥션을 못 받아 전면 지연/타임아웃.
+- **즉 지난 "pool을 30으로 늘리는" 튜닝은 밑 빠진 독이었다.** HTTP가 느려지면 커넥션이 HTTP 시간만큼 묶이는 구조 자체가 문제였으므로.
+
+#### 3) 해결법 파악
+- 방향: **트랜잭션 경계를 "상태 UPDATE 한 줄"로 축소하고, HTTP 호출은 트랜잭션 밖에서 수행.**
+- 구현 갈림길: 상태 UPDATE를 짧은 tx로 만들려면 그 자리에서 커밋돼야 하는데, **같은 클래스에 tx 메서드를 만들어 자기호출하면 Phase 7에서 본 대로 프록시 우회로 무효**가 된다. → 반드시 **다른 빈**으로 분리해 프록시를 경유하게 해야 함.
+- 전파 옵션: `submitAnalysis`에서 `@Transactional`을 제거하면 바깥 tx가 없어 기본 전파(`REQUIRED`)로도 새 tx가 생기지만, **`REQUIRES_NEW`를 명시**해 "독립된 짧은 tx"라는 의도를 코드로 못박고 향후 호출부에 tx가 생겨도 안전하게 한다.
+
+#### 4) 해결법 적용 및 확인
+- 신설 `ArticleStatusWriter` 빈(상태 변경 전담, `@Transactional(REQUIRES_NEW)`):
+  ```java
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void updateStatus(Long articleId, ArticleStatus status) {
+      articleRepository.updateStatus(articleId, status);
+  }
+  ```
+- `AiWorkerClient` 변경: 메서드의 `@Transactional` **제거**, 상태 쓰기를 `statusWriter.updateStatus(...)`로 위임(ANALYZING/FAILED 두 곳). HTTP 호출은 트랜잭션 밖으로 밀려남. 불필요해진 `ArticleRepository` 의존/`private updateStatus` 헬퍼 삭제.
+  ```
+  updateStatus(ANALYZING) → 짧은 tx 🔒🔓 (커넥션 즉시 반납)
+  AI /analyze HTTP 호출     → 커넥션 없이 대기
+  (실패 시) updateStatus(FAILED) → 짧은 tx 🔒🔓
+  ```
+- 확인(정적): `./gradlew compileJava` 성공(EXIT=0). `article`의 스칼라 필드 접근은 detached 상태에서도 안전(원래도 `@Async`라 caller tx 미전파)이라 계약/동작 불변.
+- 확인(부하, **예정**): JMeter 부하 중 Grafana `hikaricp_connections_active`/`hikaricp_connections_pending` **before/after** 비교. AI 엔진을 `MOCK_DELAY_SECONDS`로 느리게 해 재현 → before는 active가 8에 붙고 pending 급증, after는 active 낮게 유지 예상. (Phase 2 세마포어 시연과 동일 방식)
+
+#### 교훈
+- **트랜잭션 안에서 외부 I/O(HTTP/외부 API)를 호출하지 마라.** 커넥션은 "DB를 실제로 만지는 순간에만" 잡아야 한다. 느린 외부 호출을 tx로 감싸면 pool 크기를 아무리 키워도 동시성 한계에서 고갈된다.
+- HikariCP 고갈은 대개 "pool이 작아서"가 아니라 **"커넥션을 너무 오래 쥐고 있어서"**다. 튜닝 전에 **커넥션 점유 시간**을 먼저 의심할 것.
