@@ -63,6 +63,10 @@ clova:
     api-url: ${CLOVA_OCR_API_URL:}
     secret-key: ${CLOVA_OCR_SECRET_KEY:}
 
+# OpenAI Vision OCR fallback 설정
+openai:
+  api-key: ${OPENAI_API_KEY:}
+
 youtube:
   api:
     key: ${YOUTUBE_API_KEY:}
