@@ -16,4 +16,8 @@ public interface AnalysisResultRepository extends JpaRepository<AnalysisResult, 
     Optional<AnalysisResult> findByArticleId(@Param("articleId") Long articleId);
 
     Optional<AnalysisResult> findTopByOrderByIdDesc();
+
+    // 멱등성 가드용: 해당 기사의 분석 결과가 이미 저장돼 있는지 확인(중복 콜백 조기 차단).
+    @Query("SELECT COUNT(r) > 0 FROM AnalysisResult r WHERE r.article.id = :articleId")
+    boolean existsByArticleId(@Param("articleId") Long articleId);
 }

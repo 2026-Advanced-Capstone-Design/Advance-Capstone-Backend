@@ -20,8 +20,10 @@ public class AnalysisResult {
     @Column(name = "RESULT_ID")
     private Long id;
 
+    // ARTICLE_ID UNIQUE: 한 기사당 결과는 최대 1건. 콜백이 중복 도착해도 DB가 두 번째 INSERT를
+    // 거부하는 최후 방어선(멱등성). 애플리케이션 가드(handleCallback)와 함께 방어 심층(defense-in-depth).
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ARTICLE_ID")
+    @JoinColumn(name = "ARTICLE_ID", unique = true)
     private Article article;
 
     @Column(name = "title", columnDefinition = "TEXT")
