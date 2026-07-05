@@ -148,8 +148,10 @@ public class ArticleService {
         return new AnalyzeResponse(article);
     }
 
-    @Transactional
-    protected Article saveImageArticle(String imagePath) {
+    // 자기호출(submitImage → 이 메서드)이라 @Transactional을 붙여도 프록시를 우회해 무효였다.
+    // 실제로는 호출자(submitImage)의 트랜잭션 안에서 실행되므로, 오해를 부르는 애노테이션을
+    // 제거하고 private 헬퍼로 정리한다. (Spring AOP 프록시 자기호출 함정)
+    private Article saveImageArticle(String imagePath) {
         Article article = Article.createFromImage(imagePath, "");
         return articleRepository.save(article);
     }

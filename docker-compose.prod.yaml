@@ -51,19 +51,40 @@ services:
     networks:
       - newslens-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: newslens-redis
+    # 태스크 저장소 전용(캐시성) — 영속성 off, 메모리 상한 + 초과 시 오래된 것부터 제거.
+    # EC2 메모리 예산 보호: maxmemory 128mb, 컨테이너 자체 상한 160m.
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    mem_limit: 160m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - newslens-network
+
   ai-engine:
     image: jaewon0009/newslens-ai-engine:latest
     container_name: newslens-ai-engine
+    # 워커 수 토글: 운영 기본 2, 세마포어 데모는 GUNICORN_WORKERS=1 (게이지 정확도).
+    command: ["gunicorn","app:app","-k","uvicorn.workers.UvicornWorker","--bind","0.0.0.0:5000","--workers","${GUNICORN_WORKERS:-2}","--timeout","120"]
     environment:
-      FLASK_ENV: production
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      CHROMA_PERSIST_DIR: /app/chroma_db
       SPRING_CALLBACK_URL: http://backend:8080/api/v1/internal/callback
+      REDIS_URL: redis://redis:6379/0
       MOCK_MODE: ${MOCK_MODE:-false}
+      # 세마포어 백프레셔 튜닝/시연용(env로 토글). before=1000(무제한), after=5.
+      MAX_CONCURRENT_ANALYSES: ${MAX_CONCURRENT_ANALYSES:-5}
+      # MOCK 파이프라인 인위 지연(초) — 동시 실행 관측용. 운영 기본 0.
+      MOCK_DELAY_SECONDS: ${MOCK_DELAY_SECONDS:-0}
     ports:
       - "5000:5000"
-    volumes:
-      - chroma-data:/app/chroma_db
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - newslens-network
 
@@ -80,7 +101,6 @@ services:
 
 volumes:
   mysql-data:
-  chroma-data:
 
 networks:
   newslens-network:
