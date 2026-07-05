@@ -4,14 +4,12 @@ import com.factcheck.Enum.ArticleStatus;
 import com.factcheck.domain.Article;
 import com.factcheck.dto.request.AiAnalyzeRequest;
 import com.factcheck.dto.response.AiAnalyzeResponse;
-import com.factcheck.repository.ArticleRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -20,14 +18,14 @@ import org.springframework.web.client.RestClientException;
 public class AiWorkerClient {
 
     private final RestClient aiRestClient;
-    private final ArticleRepository articleRepository;
+    private final ArticleStatusWriter statusWriter;
     private final MeterRegistry meterRegistry;
 
     public AiWorkerClient(@Qualifier("aiRestClient") RestClient aiRestClient,
-                          ArticleRepository articleRepository,
+                          ArticleStatusWriter statusWriter,
                           MeterRegistry meterRegistry) {
         this.aiRestClient = aiRestClient;
-        this.articleRepository = articleRepository;
+        this.statusWriter = statusWriter;
         this.meterRegistry = meterRegistry;
     }
 
@@ -37,9 +35,11 @@ public class AiWorkerClient {
      * AI 분석 요청을 동시에 최대 8개까지 병렬 처리 가능
      */
     @Async("aiWorkerExecutor")
-    @Transactional
     public void submitAnalysis(Article article) {
-        updateStatus(article, ArticleStatus.ANALYZING);
+        // 상태 UPDATE는 짧은 독립 트랜잭션(ArticleStatusWriter)에서 처리하고 즉시 커밋 → 커넥션 반납.
+        // 아래 AI /analyze HTTP 호출은 트랜잭션 밖이라 그 사이 DB 커넥션을 점유하지 않는다.
+        // (예전엔 메서드 전체가 @Transactional이라 HTTP 대기 내내 커넥션을 물어 HikariCP가 고갈됐다.)
+        statusWriter.updateStatus(article.getId(), ArticleStatus.ANALYZING);
 
         AiAnalyzeRequest request = AiAnalyzeRequest.builder()
                 .articleId(article.getId())
@@ -68,7 +68,7 @@ public class AiWorkerClient {
         } catch (RestClientException e) {
             outcome = "failure";
             log.error("AI 서버 호출 실패: articleId={}, error={}", article.getId(), e.getMessage());
-            updateStatus(article, ArticleStatus.FAILED);
+            statusWriter.updateStatus(article.getId(), ArticleStatus.FAILED);
         } finally {
             sample.stop(Timer.builder("ai.analyze.request")
                     .description("Flask AI 엔진 /analyze 호출 지연시간")
@@ -76,9 +76,5 @@ public class AiWorkerClient {
                     .publishPercentileHistogram()
                     .register(meterRegistry));
         }
-    }
-
-    private void updateStatus(Article article, ArticleStatus status) {
-        articleRepository.updateStatus(article.getId(), status);
     }
 }
