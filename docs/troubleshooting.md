@@ -54,3 +54,37 @@
 - 백엔드 커스텀 지표 정상: `ai_analyze_request_*`(Timer), `executor_*`(ThreadPoolTaskExecutor 자동), `cache_gets_total`(Caffeine recordStats).
 - 라벨: `application="factcheck"`와 `job="backend"` 모두 유효.
 - 대시보드 6패널 중 5개 실데이터 검증(에러 로그율만 Loki 미배포로 의도적 no-data).
+
+---
+
+## 2026-07-05 — Phase 7: `@Transactional` 프록시 자기호출 함정
+
+### 사례 5 — 붙어 있어도 동작하지 않던 `@Transactional`
+
+#### 1) 문제 발견
+- `ArticleService.saveImageArticle`에 `@Transactional`이 붙어 있는데, 실제로는 트랜잭션 애노테이션이 **적용되지 않는** 상태였다. (2026-07-03 코드 감사에서 발견, 문제 D)
+- 근거: `ArticleService.submitImage`(`:128`, `@Transactional`)가 같은 클래스의 `saveImageArticle`(`:151-152`, `@Transactional protected`)를 `saveImageArticle(...)`로 **직접(자기)호출**.
+
+#### 2) 원인 분석
+1. Spring의 `@Transactional`은 **AOP 프록시**로 동작한다. 빈을 주입받아 **외부에서** 메서드를 호출하면 프록시가 가로채 트랜잭션을 시작하지만, **같은 클래스 안에서 `this.method()`로 자기호출하면 프록시를 거치지 않아** 애노테이션이 무시된다.
+2. `submitImage`(`@Transactional`) → **자기호출** `saveImageArticle`(`@Transactional protected`) 구조라, `saveImageArticle`의 애노테이션은 무효.
+3. 지금까지 버그로 드러나지 않은 이유: 호출자 `submitImage`가 이미 `@Transactional`이라, `saveImageArticle`의 `save()`가 **상위 트랜잭션에 편승**해 정상 커밋됐기 때문(잠복). 만약 `saveImageArticle`를 프록시 없이 단독으로 쓰거나, 다른 전파 옵션(`REQUIRES_NEW` 등)을 기대했다면 그 순간 조용히 깨졌을 것.
+
+#### 3) 해결법 파악
+- 선택지: (a) 별도 빈으로 분리, (b) 자기 자신을 주입(self-injection), (c) `AopContext.currentProxy()`, (d) **애노테이션 제거 + `private` 헬퍼로 정리**.
+- 이 메서드는 **별도 트랜잭션 경계가 필요 없다**(호출자의 tx에 편승하는 게 의도된 동작). 따라서 (a)~(c)는 과설계. **(d)** 가 정답 — 거짓 안전감(false confidence)을 주는 무효 애노테이션을 걷어내고, "호출자 트랜잭션 안에서 실행되는 헬퍼"임을 코드로 드러낸다. 호출부가 `submitImage` 하나뿐임을 grep으로 확인해 `private` 격하가 안전함을 검증.
+
+#### 4) 해결법 적용 및 확인
+- 적용:
+  ```java
+  // before
+  @Transactional
+  protected Article saveImageArticle(String imagePath) { ... }
+  // after (private 헬퍼 + 애노테이션 제거)
+  private Article saveImageArticle(String imagePath) { ... }
+  ```
+- 확인: `./gradlew compileJava` 성공(무관한 deprecation 경고만). 동작은 이전과 동일(상위 tx 편승 유지)이라 계약 변화 없음.
+
+#### 교훈
+- **`@Transactional`(및 `@Async`, `@Cacheable` 등 모든 프록시 기반 애노테이션)은 자기호출에서 무효다.** 별도 트랜잭션 경계가 필요하면 다른 빈 분리 / self-injection / `AopContext`를 써야 하고, 필요 없으면 애노테이션을 제거해 오해를 없애야 한다.
+- 이 감별은 **Phase 8**(트랜잭션 경계 축소)에서 `REQUIRES_NEW`로 상태 쓰기를 분리할 때 직접 재사용된다 — 거기선 반대로 "경계가 필요한" 경우라 별도 빈으로 뽑는다.
