@@ -173,3 +173,40 @@
 - **네트워크 경계를 넘는 콜백/웹훅 수신부는 항상 멱등하게 설계한다.** "정확히 한 번 온다"는 가정은 분산 환경에서 성립하지 않는다.
 - 멱등성은 **앱 가드 + DB 제약을 함께** 두는 게 정석. 앱 가드는 정상 흐름의 500을 없애고, DB 제약은 동시성 경합·로직 버그까지 막는 최후 방어선.
 - 다음(9-5, AI 콜백 재시도)을 붙이면 중복 확률이 **올라가므로**, 멱등성(9-1)을 먼저 깐 순서가 맞다.
+
+---
+
+## 2026-07-05 — Phase 9-2: 상태 쓰기 순서 경합 (DONE을 ANALYZING이 덮어써 stuck)
+
+### 사례 8 — 늦게 커밋된 ANALYZING이 이미 끝난 DONE을 되돌리던 문제
+
+#### 1) 문제 발견
+- 기사 상태(`status`)를 **서로 다른 스레드**가 쓴다: 요청 스레드(`AiWorkerClient` → `ANALYZING`)와 콜백 스레드(`AnalysisCallbackService` → `DONE`). 두 쓰기가 **무조건 UPDATE**(`SET status=? WHERE id=?`)라, 커밋 순서가 엇갈리면 **늦게 온 ANALYZING이 이미 끝난 DONE을 덮어써** 기사가 영구 "분석 중"에 멈춘다(stuck). (2026-07-03 감사, 문제 A4)
+- 근거: `AiWorkerClient`의 상태 쓰기(`ArticleStatusWriter.updateStatus`)와 `AnalysisCallbackService.handleCallback`의 `DONE` 쓰기가 순서 보장 없이 경합.
+
+#### 2) 원인 분석
+- 상태 전이에 **선행 상태 조건이 없었다.** "지금 무슨 상태든 그냥 이 값으로 덮어써"라, 물리적 커밋 순서가 곧 최종 상태가 됨.
+- Phase 8에서 ANALYZING 쓰기를 HTTP 호출 **앞**으로 옮겨(짧은 tx 즉시 커밋) 순서가 대체로 정렬됐지만, 이는 **타이밍에 기댄 완화**일 뿐 **보장**은 아니다. 스레드 스케줄링·GC 지연 등으로 언제든 역전 가능.
+- 정합성은 "순서가 우연히 맞기를 바라는" 게 아니라 **순서와 무관하게 옳아야** 한다.
+
+#### 3) 해결법 파악
+- **조건부 UPDATE(compare-and-set)**: "현재 상태가 기대값일 때만 전이"하도록 `WHERE` 절에 선행 상태를 넣는다. DB의 UPDATE는 원자적이라 락 없이도 경합이 해소된다.
+  - `ANALYZING`은 **`PENDING`일 때만**, `FAILED`(요청 실패)는 **`ANALYZING`일 때만** 전이.
+  - → ANALYZING의 선행조건이 PENDING이므로, **이미 DONE/FAILED인 기사를 ANALYZING이 절대 덮을 수 없다.** 경합의 나쁜 방향(뒤로 감기)이 원천 차단.
+- 대안이던 `@Version`(낙관적 락)은 엔티티 로드+충돌 재시도가 필요해 벌크 상태전이엔 과함. 단일 컬럼 CAS가 더 가볍고 직접적이라 채택.
+
+#### 4) 해결법 적용 및 확인
+- `ArticleRepository`: 무조건 `updateStatus` **제거** → 조건부 `int updateStatusIfCurrent(id, expectedStatus, newStatus)` 신설(`WHERE id=? AND status=expected`, 갱신 행 수 반환).
+- `ArticleStatusWriter.updateStatus`: 시그니처를 `(id, expected, next)`로 변경, 갱신 0행이면 `WARN` 로그 + `false` 반환(전이 스킵을 관측 가능하게).
+- `AiWorkerClient`: 호출부 2곳 → `updateStatus(id, PENDING, ANALYZING)`, `updateStatus(id, ANALYZING, FAILED)`.
+- 콜백의 `DONE`(dirty checking)은 그대로 둠 — ANALYZING이 PENDING에서만 오게 막았으므로 DONE을 덮을 주체가 사라졌고, 9-1 멱등 가드가 중복 DONE도 이미 차단.
+- 확인(정적): `./gradlew compileJava` 성공(EXIT=0).
+- 확인(동작, **예정**): DONE 먼저/ANALYZING 나중 순서를 인위적으로 만들어(콜백을 빨리 쏘기) 최종 상태가 DONE으로 유지되는지 검증. `상태 전이 스킵` WARN 카운터로 관측.
+
+#### 관련 발견(별도, 9-4에서 처리) — @Async 디스패치가 커밋보다 먼저 실행되는 race
+- `submitText`/`submitUrl`이 **자기 트랜잭션 안에서** `aiWorkerClient.submitAnalysis`(@Async)를 호출한다. @Async는 즉시 다른 스레드로 위임되므로, **호출자 tx가 커밋되기 전에** async 스레드가 먼저 돌 수 있다. 그러면 `updateStatusIfCurrent(PENDING→ANALYZING)`가 아직 안 보이는 행을 만나 **0행**(전이 실패) → PENDING에 잠깐 갇힘.
+- 이는 조건부 UPDATE 도입으로 **새로 생긴 문제는 아니다**(무조건 UPDATE도 커밋 전이면 0행). `submitImage`가 OCR을 `TransactionSynchronization.afterCommit`으로 띄우는 것과 **일관되게**, analyze 트리거도 afterCommit으로 옮기는 게 정석. **9-4(스위퍼)에서 PENDING-stuck까지 재조정 대상에 포함**하고, 트리거 afterCommit화도 함께 검토.
+
+#### 교훈
+- **동시성 정합성은 "타이밍이 맞기를 바라는 것"이 아니라 "순서와 무관하게 옳게" 만드는 것.** 상태 머신 전이는 선행 상태를 조건으로 건 **조건부 UPDATE(CAS)** 로 표현하면 락 없이 원자적으로 안전해진다.
+- 갱신 **행 수(0/1)를 반환·로깅**하면 "전이가 조용히 무시된" 사건을 관측할 수 있어, 숨은 경합을 지표로 드러낼 수 있다.
