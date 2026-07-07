@@ -37,6 +37,14 @@ public class AnalysisCallbackService {
         Article article = articleRepository.findById(req.getArticleId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.ARTICLE_NOT_FOUND));
 
+        // 멱등성 가드: 이미 결과가 저장돼 있으면(=이전 콜백이 성공 처리됨) 중복 콜백이므로 조용히 무시한다.
+        // 분산 환경에서 콜백은 유실·중복될 수 있어(at-least-once), 받는 쪽이 몇 번 와도 안전해야 한다.
+        // 최종 방어선은 ARTICLE_ID UNIQUE(DB)이고, 이 가드는 정상 흐름에서 중복 INSERT/500을 예방한다.
+        if (analysisResultRepository.existsByArticleId(req.getArticleId())) {
+            log.info("중복 콜백 무시 (분석 결과 이미 존재): articleId={}", req.getArticleId());
+            return;
+        }
+
         if ("FAILED".equals(req.getStatus())) {
             article.updateStatus(ArticleStatus.FAILED);
             log.warn("AI 분석 실패: articleId={}, error={}", req.getArticleId(), req.getError());

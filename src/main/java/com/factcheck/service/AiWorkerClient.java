@@ -39,7 +39,8 @@ public class AiWorkerClient {
         // 상태 UPDATE는 짧은 독립 트랜잭션(ArticleStatusWriter)에서 처리하고 즉시 커밋 → 커넥션 반납.
         // 아래 AI /analyze HTTP 호출은 트랜잭션 밖이라 그 사이 DB 커넥션을 점유하지 않는다.
         // (예전엔 메서드 전체가 @Transactional이라 HTTP 대기 내내 커넥션을 물어 HikariCP가 고갈됐다.)
-        statusWriter.updateStatus(article.getId(), ArticleStatus.ANALYZING);
+        // 조건부 전이(PENDING→ANALYZING): 이미 콜백이 DONE으로 끝낸 기사를 뒤늦게 ANALYZING으로 덮지 않는다(A4).
+        statusWriter.updateStatus(article.getId(), ArticleStatus.PENDING, ArticleStatus.ANALYZING);
 
         AiAnalyzeRequest request = AiAnalyzeRequest.builder()
                 .articleId(article.getId())
@@ -68,7 +69,8 @@ public class AiWorkerClient {
         } catch (RestClientException e) {
             outcome = "failure";
             log.error("AI 서버 호출 실패: articleId={}, error={}", article.getId(), e.getMessage());
-            statusWriter.updateStatus(article.getId(), ArticleStatus.FAILED);
+            // 조건부 전이(ANALYZING→FAILED): 이미 DONE/다른 상태면 덮지 않는다.
+            statusWriter.updateStatus(article.getId(), ArticleStatus.ANALYZING, ArticleStatus.FAILED);
         } finally {
             sample.stop(Timer.builder("ai.analyze.request")
                     .description("Flask AI 엔진 /analyze 호출 지연시간")
