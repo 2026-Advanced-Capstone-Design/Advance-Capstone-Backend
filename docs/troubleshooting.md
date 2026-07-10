@@ -318,3 +318,41 @@
 - **before/after 시연은 검증이자 발견 도구다.** "고쳤다"를 찍으러 갔다가 감사 내용의 부정확(발견 3)과 환경 함정 2개를 찾았다. 수정 후 재현 촬영을 생략했다면 몰랐을 것들.
 - **DB 제약과 앱 가드는 대체재가 아니라 보완재.** DB UNIQUE는 데이터 무결성(행이 안 깨짐)을, 앱 멱등 가드는 프로토콜 의미론(중복=성공 no-op)을 지킨다. 전자만 있으면 "데이터는 멀쩡한데 시스템은 서로 실패했다고 믿는" 상태가 된다.
 - **로컬 시연 환경도 프로덕션만큼 의심하라.** 인코딩(터미널→프로세스 경계), 스키마 잔재, ORM의 암묵적 DDL — 세 개 모두 "코드 밖"에서 온 함정이었다.
+
+---
+
+## 2026-07-11 — Phase 7~9 + FastAPI 전환 EC2 배포, 그리고 배포 검증이 잡아낸 버그
+
+### 사례 12 — Flask→FastAPI 전환 후 첫 실전 호출이 422로 터진 문제 (JDK HttpClient h2c vs uvicorn)
+
+#### 1) 문제 발견
+- Phase 7~9(백엔드)와 FastAPI 전환분+9-5(AI 엔진)를 EC2에 배포한 뒤 **end-to-end 검증**(텍스트 분석 제출→콜백→결과)을 돌리자, 기사가 5초 만에 `FAILED`.
+- 로그 2개가 단서:
+  - AI 엔진(uvicorn): `WARNING: Unsupported upgrade request.` / `Invalid HTTP request received.`
+  - 백엔드: `AI 서버 호출 실패: 422 Unprocessable Entity: {"detail":[{"type":"missing","loc":["body"],"msg":"Field required"}]}` — **요청은 도착했는데 바디가 비어 있음**.
+
+#### 2) 원인 분석
+- 백엔드의 `aiRestClient`(Spring `RestClient`)는 **기본 설정** → 내부적으로 JDK `java.net.http.HttpClient` 사용.
+- JDK HttpClient의 **기본 프로토콜은 HTTP/2**. 평문 `http://` 대상에는 HTTP/2로 직접 시작할 수 없어, HTTP/1.1 요청에 **`Upgrade: h2c` + `HTTP2-Settings` 협상 헤더를 자동으로 끼워** 보낸다.
+- 서버별 반응이 갈렸다:
+  - **옛 Flask(gunicorn sync)**: 모르는 헤더 무시하고 바디 처리 → 지금까지 정상 동작(문제 잠복).
+  - **새 FastAPI(uvicorn/h11)**: h2c 업그레이드 미지원 — 경고를 남기고 **요청 파싱이 깨져 바디가 유실** → FastAPI가 "body Field required" 422.
+- 즉 **호출 코드도, API 계약도 안 바뀌었는데 서버 구현체 교체만으로 터진 통합 결함**. "인터페이스가 같으면 교체는 안전하다"는 가정이 프로토콜 협상 레벨에서 깨진 사례(추상화 누수).
+- **로컬 검증으로 원리적으로 못 잡았던 이유**: Phase 2 검증(TestClient 스모크, AI에 직접 curl, MOCK 부하)은 모두 "Spring RestClient → uvicorn" 경로가 아니었다. 이 조합은 백엔드 경유 실전 호출에서만 만들어지고, 그것이 배포 후 e2e 검증에서 처음 실행됐다.
+
+#### 3) 해결법 파악
+- 방향 후보: (a) 백엔드가 업그레이드 협상을 안 하게 HTTP/1.1 고정, (b) uvicorn 쪽에서 h2c 수용 — uvicorn은 h2c 미지원이라 불가, (c) 프록시 삽입 — 과함.
+- **(a) 채택**: `HttpClient.Version.HTTP_1_1` 명시. AI 엔진과의 통신은 내부망 단거리 호출이라 HTTP/2의 이점(멀티플렉싱)이 무의미하고, 협상 자체를 없애는 게 가장 단순·확실.
+
+#### 4) 해결법 적용 및 확인
+- `RestClientConfig.aiRestClient()`: `JdkClientHttpRequestFactory(HttpClient.newBuilder().version(HTTP_1_1).build())` 주입 + 이유 주석.
+- 재배포 후 동일 e2e 재실행: 제출 → ANALYZING → **20초 만에 DONE** → 결과 200. 콜백 지표 `ai_callback_retry_total=0`, `ai_callback_final_failure_total=0`(정상 네트워크 1회 전달).
+
+#### 같은 날 배포에서 확인·조치한 것 (기록)
+- **운영 DB DDL**: `analysis_results.article_id` UNIQUE는 **이미 존재**(@OneToOne 자동 생성 — 사례 11 발견 3이 운영에서도 확인됨, 최악 시나리오는 운영에 없었음). `analysis_cache.url_hash`는 UNIQUE 없음 + **실제 중복 1쌍 발견**(같은 URL 동시요청 스탬피드의 실물 증거) → 최신 행만 남기고 정리 후 `uk_analysis_cache_url_hash` 추가.
+- **EC2 운영 메모**: 이 인스턴스는 `docker compose`(공백) 미지원 — **`docker-compose`(하이픈)** 사용. 접속 계정은 `ubuntu`.
+
+#### 교훈
+- **배포 후 end-to-end 검증은 선택이 아니다.** 단위·MOCK·직접호출 검증을 다 통과해도, 실전 조합(클라이언트 구현체 × 서버 구현체)은 e2e에서만 만들어진다. 이번 버그는 e2e 검증이 없었으면 사용자가 처음 발견했을 것.
+- **프레임워크 기본값을 모르면 그게 잠복 버그다.** curl의 CP949 인자 변환, @OneToOne의 자동 UNIQUE, JDK HttpClient의 h2c 협상 — 이틀간 잡은 세 사고 모두 "내가 쓴 코드 바깥의 기본값"이 원인이었다.
+- **구성요소를 교체하면 그 컴포넌트의 "관용(tolerance)"도 함께 사라질 수 있다.** 옛 서버가 조용히 눈감아주던 비표준 동작이 무엇이었는지는, 교체 후에야 드러난다.
