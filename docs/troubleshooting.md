@@ -162,7 +162,9 @@
 - `AnalysisResultRepository.java`: 멱등 가드용 `existsByArticleId(Long)` 쿼리 추가(`SELECT COUNT(r) > 0 ...`).
 - `AnalysisCallbackService.handleCallback`: `findById` 직후 **가드 삽입** — `existsByArticleId`면 로그 남기고 `return`(FAILED 분기보다 앞이라, 늦게 온 FAILED가 이미 DONE을 덮지도 못함).
 - 확인(정적): `./gradlew compileJava` 성공(EXIT=0).
-- 확인(동작, **예정**): 같은 콜백 바디를 2회 POST → 1회차 정상 저장/DONE, 2회차 "중복 콜백 무시" 로그 + 결과 1건 유지 + 조회 200. Micrometer 카운터(중복 콜백 수)로 관측 예정.
+- 확인(동작, **완료 2026-07-10**): `scripts/demo-phase9.sh a`로 before/after 로컬 재현·촬영.
+  - **before**(`9314f69`): 2회차 콜백 **HTTP 500**(제어 안 된 `ConstraintViolationException`) — 예상했던 "행 2개 + 조회 500"이 아니라 **@OneToOne이 만든 자동 UNIQUE가 DB에서 이미 막고 있었음**(→ 사례 11 발견 3, 감사 내용 정정).
+  - **after**(develop): 1·2회차 모두 200, 2회차는 `중복 콜백 무시 (분석 결과 이미 존재): articleId=1` INFO 로그, 결과행 1건, 조회 200. Micrometer 카운터(중복 콜백 수)는 추후 지표화.
 - ⚠️ **운영 주의(migration)**: 현재 스키마는 Flyway 없이 `ddl-auto: update`. Hibernate `update`는 **기존 MySQL 테이블의 컬럼에 UNIQUE 제약을 자동 추가하지 못할 수 있다**(새로 만드는 테이블엔 적용). 이미 운영 중인 DB에는 수동 DDL 필요:
   ```sql
   ALTER TABLE analysis_results ADD CONSTRAINT uk_analysis_results_article UNIQUE (ARTICLE_ID);
@@ -274,8 +276,45 @@
 - `ArticleRepository`: `findStuck(statuses, threshold, Pageable)` 쿼리 신설(오래된 순, 배치 상한).
 - `StuckAnalysisSweeper`(신규 `@Component`): `@Scheduled(fixedDelay 기본 60s)` `sweep()` — stuck 후보를 `statusWriter.updateStatus(id, 현재상태, FAILED)`로 조건부 전이 + WARN 로그 + 스윕 요약 로그. 튜닝 키(기본값 내장): `analysis.sweeper.stuck-minutes(10)`, `batch-size(100)`, `interval-ms(60000)`.
 - 확인(정적): `./gradlew compileJava` 성공(EXIT=0).
-- 확인(동작, **예정**): 콜백을 일부러 누락시켜(AI가 콜백 안 쏘게) ANALYZING 방치 → 임계시간 후 스위퍼가 FAILED 전이하는지 로그로 확인. `stuck 분석 재조정` WARN 카운트를 Micrometer 지표화 예정.
+- 확인(동작, **완료 2026-07-10**): `scripts/demo-phase9.sh b`로 before/after 로컬 재현·촬영 (`--analysis.sweeper.stuck-minutes=1 --analysis.sweeper.interval-ms=10000`으로 임계 단축).
+  - **before**(`9314f69`): 콜백 유실 시뮬레이션(ANALYZING + 생성시각 5분 전) → **90초 폴링 내내 ANALYZING** (영구 stuck).
+  - **after**(develop): 폴링 2번째(5초)만에 **FAILED 자동 전이**. 로그: `stuck 분석 재조정: articleId=2, ANALYZING → FAILED (생성 후 1분 초과 미완료)` WARN + `stuck 분석 스윕 완료: 후보 1건 중 1건 FAILED 전이` INFO. WARN 카운트 Micrometer 지표화는 추후.
 
 #### 교훈
 - **네트워크 경계의 비동기 결과는 "재조정(reconciliation) 루프"로 최종 일관성을 보장한다.** 재시도(9-5)·멱등(9-1)이 정상 경로를 지키고, 스위퍼는 "그래도 새어나간" 경우를 뒤에서 줍는 최후 안전망. 세 개가 층을 이룬다.
 - **@Async 트리거는 항상 afterCommit에서.** 트랜잭션 커밋 전에 비동기 작업을 띄우면 "아직 없는 데이터"를 두고 경쟁한다.
+
+---
+
+## 2026-07-10 — Phase 9 before/after 시연 촬영 중 발견 3건
+
+### 사례 11 — 시연이 대신 찾아준 것들: curl 한글 깨짐, 스키마 잔재, @OneToOne의 숨은 UNIQUE
+
+> 배경: 9-1(멱등성)·9-4(스위퍼)의 before/after 증거를 `scripts/demo-phase9.sh`로 로컬 재현·촬영.
+> before = `git checkout 9314f69`(Phase 8 시점, 가드·스위퍼 없음), after = develop. 로컬 MySQL + `ddl-auto: create`.
+> 첫 실행에서 "콜백 1회차부터 500 + 결과행 0"이라는 **예상 밖 실패**가 났고, 원인을 파다가 3가지를 발견했다.
+
+#### 발견 1 — Windows curl이 한글 인자를 CP949로 변환 → JSON 파싱 500
+- **증상**: 콜백 1회차부터 500. 로그: `JsonParseException: Invalid UTF-8 start byte 0xb5`.
+- **원인**: 스크립트 파일은 UTF-8이 맞지만, Git Bash가 **네이티브 Windows `curl.exe`에 인자를 넘길 때** 한글이 ANSI 코드페이지(**CP949**)로 변환된다. `0xB5`는 CP949 "데"의 첫 바이트. Spring은 UTF-8로 해석하므로 파싱 단계에서 즉사 — `handleCallback` 로직에 도달조차 못 했다.
+- **해결**: 데모 페이로드에서 한글 제거(`"데모 주제"` → `"phase9-demo-topic"`). Windows에서 curl로 non-ASCII 바디를 보낼 땐 **인자 대신 파일(`-d @file`)로** 넘기는 것이 안전.
+
+#### 발견 2 — `ddl-auto: create`가 옛 테이블 잔재의 FK에 막혀 스키마 재생성 실패
+- **증상**: 결과 조회 500. 로그: `Unknown column 'ar1_0.bias_confidence'` — 엔티티엔 있는 컬럼이 테이블에 없음.
+- **원인**: 로컬 DB에 **다른 브랜치/과거 스키마의 잔재**(`source_references` 등)가 남아 있었고, 그 테이블의 FK가 `analysis_results`를 참조 → `ddl-auto: create`의 DROP이 실패 → CREATE도 실패("already exists") → **낡은 테이블이 그대로 서빙**됨. `create`라고 항상 깨끗한 스키마를 보장하지 않는다.
+- **해결**: `DROP DATABASE factcheck; CREATE DATABASE ...` 후 앱 재기동. 시연·테스트용 로컬 DB는 의심스러우면 DB째 초기화가 확실하다.
+
+#### 발견 3 (핵심) — @OneToOne이 만들어둔 자동 UNIQUE: 감사 내용 정정
+- **증상**: DB 초기화 후 before 재실행 결과가 예상("콜백 2회 다 200 → 행 2개 → 조회 500")과 달랐다: **2회차 콜백이 500**(`ConstraintViolationException: Duplicate entry ... UKgdfrjdt6a45b7tku3ofo5psjl`), 행 1개, 조회 200.
+- **원인**: `AnalysisResult.article`이 **`@OneToOne`** 인데, Hibernate는 @OneToOne @JoinColumn에 `unique = true`가 없어도 **DDL 생성 시 UNIQUE 제약을 자동 추가**한다. 즉 신규 생성 스키마에는 DB 방어선이 **처음부터 우연히 존재**했다.
+- **감사(7/3, A1) 정정**: "중복 콜백 → 행 2개 → `NonUniqueResultException`" 시나리오는 **UNIQUE가 없는 DB에서만** 성립한다(옛 스키마로 만들어진 뒤 `ddl-auto: update`로만 유지된 운영 DB가 정확히 그런 후보). 신규 스키마의 before 실체는 "**중복 콜백에 제어 안 된 500**"이다.
+- **그래도 9-1 수정이 필요한 이유** (발표 예상질문 "우연히 막혀 있는데 왜 고쳤나"의 답):
+  1. 500은 "막은 것"이지 "올바른 처리"가 아니다 — 이미 반영된 요청에 실패를 응답하면, 9-5 재시도가 붙는 순간 **성공한 분석이 "콜백 최종 실패"로 분류**되는 모순이 매번 발생(재시도는 중복이므로 영원히 500).
+  2. 에러 로그·에러율 지표가 가짜 장애로 오염된다(진짜 `ConstraintViolationException` 장애와 구분 불가).
+  3. 자동 UNIQUE는 **아무도 의도하지 않은 부산물** — 운영 DB엔 없을 수 있고, @OneToOne→@ManyToOne 리팩토링 한 번에 조용히 사라진다. 9-1이 `unique = true`를 명시한 것은 우연을 **의도된 계약으로 문서화**한 것.
+- **운영 액션**: 배포 전 운영 DB에서 `SHOW INDEX FROM analysis_results WHERE Non_unique=0;`으로 UNIQUE 존재를 **확인**할 것(없으면 9-1의 수동 DDL 실행).
+
+#### 교훈
+- **before/after 시연은 검증이자 발견 도구다.** "고쳤다"를 찍으러 갔다가 감사 내용의 부정확(발견 3)과 환경 함정 2개를 찾았다. 수정 후 재현 촬영을 생략했다면 몰랐을 것들.
+- **DB 제약과 앱 가드는 대체재가 아니라 보완재.** DB UNIQUE는 데이터 무결성(행이 안 깨짐)을, 앱 멱등 가드는 프로토콜 의미론(중복=성공 no-op)을 지킨다. 전자만 있으면 "데이터는 멀쩡한데 시스템은 서로 실패했다고 믿는" 상태가 된다.
+- **로컬 시연 환경도 프로덕션만큼 의심하라.** 인코딩(터미널→프로세스 경계), 스키마 잔재, ORM의 암묵적 DDL — 세 개 모두 "코드 밖"에서 온 함정이었다.

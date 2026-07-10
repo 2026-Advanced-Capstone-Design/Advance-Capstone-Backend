@@ -34,7 +34,7 @@ echo "✅ 앱 응답 OK: $APP"
 insert_article() {  # $1=status  $2=created_at_sql
   $MYSQL -N -s -e \
     "INSERT INTO articles (input_type, original_text, status, created_at)
-     VALUES ('TEXT', 'phase9 데모용 본문', '$1', $2);
+     VALUES ('TEXT', 'phase9 demo body', '$1', $2);
      SELECT LAST_INSERT_ID();"
 }
 
@@ -50,7 +50,8 @@ demo_a() {
   local ID; ID=$(insert_article "ANALYZING" "NOW()")
   echo "· 분석 대기 기사 생성: articleId=$ID (status=ANALYZING)"
 
-  local CB="{\"article_id\":$ID,\"status\":\"DONE\",\"topic\":\"데모 주제\"}"
+  # 주의: JSON에 한글 금지 — Windows curl이 인자를 CP949로 변환해 Spring JSON 파싱 500 유발
+  local CB="{\"article_id\":$ID,\"status\":\"DONE\",\"topic\":\"phase9-demo-topic\"}"
 
   echo; echo "STEP 1) 콜백 1회차 →"
   curl -s -o /dev/null -w "   HTTP %{http_code}\n" -X POST "$APP/api/v1/internal/callback" \
