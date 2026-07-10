@@ -1,6 +1,6 @@
 package com.factcheck.service;
 
-import com.factcheck.domain.AnalysisCache;
+import com.factcheck.Enum.ArticleStatus;
 import com.factcheck.domain.Article;
 import com.factcheck.dto.request.TextRequest;
 import com.factcheck.dto.request.UrlRequest;
@@ -83,7 +83,9 @@ public class ArticleService {
 
         Article article = request.toEntity(processed);
         articleRepository.save(article);
-        aiWorkerClient.submitAnalysis(article);
+        // 커밋 후에 분석을 트리거한다. @Async는 즉시 다른 스레드로 넘어가므로, 커밋 전에 호출하면
+        // 아직 안 보이는 기사에 대해 ANALYZING 전이가 0행이 되어 PENDING에 갇힐 수 있다(9-2 발견).
+        runAfterCommit(() -> aiWorkerClient.submitAnalysis(article));
         return new AnalyzeResponse(article);
     }
 
@@ -94,6 +96,9 @@ public class ArticleService {
 
         return analysisCacheRepository.findByUrlHash(urlHash)
                 .filter(cache -> !cache.isExpired())
+                // DONE된 기사만 캐시 히트로 인정. 진행중(ANALYZING)/실패(FAILED) 기사는 캐시로 서빙하지 않는다
+                // → 한 번 실패한 URL이 7일간 고장 상태로 재사용되던 결함(B) 차단. (캐시 저장은 콜백 DONE 시점)
+                .filter(cache -> cache.getArticle().getStatus() == ArticleStatus.DONE)
                 .map(cache -> {
                     cache.incrementHitCount();
                     return new AnalyzeResponse(cache.getArticle());
@@ -114,12 +119,9 @@ public class ArticleService {
                     Article article = request.toEntity(title, processedText);
                     articleRepository.save(article);
 
-                    analysisCacheRepository.save(AnalysisCache.builder()
-                            .urlHash(urlHash)
-                            .article(article)
-                            .build());
-
-                    aiWorkerClient.submitAnalysis(article);
+                    // 캐시는 분석이 DONE된 뒤(콜백)에 저장한다. 여기서 미리 저장하면 미완료/실패 결과가 캐시된다.
+                    // 분석 트리거는 커밋 후에(afterCommit) — 커밋 전 @Async 실행 시 ANALYZING 전이 유실 방지.
+                    runAfterCommit(() -> aiWorkerClient.submitAnalysis(article));
                     return new AnalyzeResponse(article);
                 });
     }
@@ -138,14 +140,23 @@ public class ArticleService {
         Article article = saveImageArticle(savedFiles.get(0).getPath());
 
         Long articleId = article.getId();
+        runAfterCommit(() -> ocrAsyncService.processOcrAsync(articleId, savedFiles));
+
+        return new AnalyzeResponse(article);
+    }
+
+    /**
+     * 현재 트랜잭션이 성공적으로 커밋된 뒤에 {@code action}을 실행한다.
+     * @Async 작업을 커밋 전에 트리거하면 아직 커밋 안 된 데이터를 다른 스레드가 못 보는 race가
+     * 생기므로, 후속 비동기 작업(분석 요청·OCR)은 반드시 afterCommit 시점에 띄운다.
+     */
+    private void runAfterCommit(Runnable action) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                ocrAsyncService.processOcrAsync(articleId, savedFiles);
+                action.run();
             }
         });
-
-        return new AnalyzeResponse(article);
     }
 
     // 자기호출(submitImage → 이 메서드)이라 @Transactional을 붙여도 프록시를 우회해 무효였다.

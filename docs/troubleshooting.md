@@ -210,3 +210,72 @@
 #### 교훈
 - **동시성 정합성은 "타이밍이 맞기를 바라는 것"이 아니라 "순서와 무관하게 옳게" 만드는 것.** 상태 머신 전이는 선행 상태를 조건으로 건 **조건부 UPDATE(CAS)** 로 표현하면 락 없이 원자적으로 안전해진다.
 - 갱신 **행 수(0/1)를 반환·로깅**하면 "전이가 조용히 무시된" 사건을 관측할 수 있어, 숨은 경합을 지표로 드러낼 수 있다.
+
+---
+
+## 2026-07-05 — Phase 9-3: 캐시가 미완료/실패 분석을 서빙하던 문제
+
+### 사례 9 — 한 번 실패한 URL이 7일간 고장 상태로 재사용
+
+#### 1) 문제 발견
+- `submitUrl`이 **분석 완료를 기다리지 않고** 크롤링 직후 `AnalysisCache`를 저장했다. 그래서 그 기사가 `ANALYZING`(진행중)이거나 `FAILED`(실패)여도, 캐시 유효기간(7일) 동안 같은 URL 요청이 **그 고장난 기사를 히트로 반환** → 실패한 URL을 7일 내내 못 고침. (2026-07-03 감사, 문제 B)
+- 근거: `ArticleService.submitUrl`이 `articleRepository.save` 직후 `analysisCacheRepository.save(...)`(완료 전) + `AnalysisCache.url_hash`에 UNIQUE 없음(동시요청 시 중복행/스탬피드 + `findByUrlHash` NonUniqueResult 위험).
+
+#### 2) 원인 분석
+- 캐시에 넣는 **시점이 틀렸다.** "요청 접수 시점"에 넣으니 아직 결과가 없는(또는 앞으로 실패할) 기사가 캐시에 박힘. 캐시의 의미는 "**완료된 결과의 재사용**"인데, 미완료 상태를 캐싱한 것.
+- 읽는 쪽도 **상태를 안 봤다.** `!expired`만 보고 히트 처리 → 상태가 뭐든 그냥 반환.
+- `url_hash` 유일성 미보장 → 동시 요청이 각자 캐시행을 만들어 중복/스탬피드.
+
+#### 3) 해결법 파악
+- **쓰기 시점 이동**: 캐시는 **콜백에서 DONE 처리 직후에만** 저장. 그러면 캐시에는 완료된 기사만 들어간다("DONE일 때만 유효"를 시점으로 보장).
+- **읽기 가드**: `submitUrl` 히트 조건에 `status == DONE` 추가(과거 오염된 레거시 캐시행도 자동 무시 → 재분석 유도).
+- **유일성**: `url_hash` UNIQUE. 재분석 시엔 기존 행을 **`refresh()`로 갱신**(새 기사로 교체 + TTL 리셋)해 UNIQUE와 공존.
+- **캐시 실패 격리**: 캐시는 최적화이므로 그 쓰기 실패가 **결과 저장/DONE 전이를 롤백시키면 안 된다.** → 별도 빈 `AnalysisCacheWriter`에서 `REQUIRES_NEW` 독립 tx로 수행하고, 동시요청 UNIQUE 위반은 상위에서 `DataIntegrityViolationException`를 잡아 best-effort로 무시.
+- 완전한 스탬피드 차단(같은 새 URL 동시요청 시 분석 1회로 병합)은 분산락/single-flight가 필요 → **범위 밖(추후)**. 지금은 "중복행/실패서빙" 정합성만 확실히 잡음.
+
+#### 4) 해결법 적용 및 확인
+- `AnalysisCache`: `url_hash`에 `unique = true` + `refresh(Article)` 메서드(재분석 시 갱신).
+- `AnalysisCacheWriter`(신규): `@Transactional(REQUIRES_NEW)` `cacheDoneResult(urlHash, articleId)` — `findByUrlHash` upsert(있으면 refresh, 없으면 save). `getReferenceById`로 FK만 참조(교차 영속성 컨텍스트 회피).
+- `AnalysisCallbackService.handleCallback`: DONE 처리 직후, URL 입력 기사면 `analysisCacheWriter.cacheDoneResult(...)` 호출(try/catch로 UNIQUE 경합 무시).
+- `ArticleService.submitUrl`: 히트 조건에 `status == DONE` 필터 추가 + **submit 시점 캐시 save 제거**(안 쓰게 된 AnalysisCache import 정리).
+- 확인(정적): `./gradlew compileJava` 성공(EXIT=0).
+- 확인(동작, **예정**): (a) 분석 실패 후 같은 URL 재요청 → 캐시 히트 아님, 재분석됨. (b) DONE 후 같은 URL → 히트(hit_count 증가). (c) 동시 2요청 → 캐시행 1개 유지.
+- ⚠️ **운영 주의(migration)**: 9-1과 동일. `ddl-auto: update`는 기존 테이블에 UNIQUE 자동 추가 못할 수 있음 → 수동 DDL + 기존 중복 url_hash 정리 필요:
+  ```sql
+  ALTER TABLE analysis_cache ADD CONSTRAINT uk_analysis_cache_url_hash UNIQUE (url_hash);
+  ```
+
+#### 교훈
+- **캐시에는 "완료·성공한 결과"만 넣는다.** 진행중/실패 상태를 캐싱하면 실패가 TTL만큼 굳어버린다. 쓰기 시점을 라이프사이클의 올바른 지점(완료)으로 옮기는 게 읽기 필터보다 근본적.
+- **캐시 쓰기는 주 트랜잭션에서 격리(best-effort)한다.** 최적화가 실패해도 본질(결과 저장)은 성공해야 한다.
+
+---
+
+## 2026-07-05 — Phase 9-4: 유실된 콜백 재조정(스위퍼) + afterCommit 트리거
+
+### 사례 10 — 콜백이 유실되면 영구 "분석 중"에 갇히던 문제
+
+#### 1) 문제 발견
+- AI → Spring 콜백은 fire-and-forget이라, **콜백이 유실되거나 수신 중 Spring이 다운되면** 기사가 `ANALYZING`에 **영구히 갇힌다**(사용자 화면 계속 "분석 중"). 스스로 빠져나올 재조정 주체가 없음. (2026-07-03 감사, 문제 A2)
+- 여기에 9-2에서 발견한 **트리거 유실**까지 겹칠 수 있음: `submitText`/`submitUrl`이 커밋 전에 `@Async` 분석을 호출 → async가 커밋보다 먼저 돌면 ANALYZING 전이가 0행 → `PENDING`에 갇힘.
+
+#### 2) 원인 분석
+- **탈출 경로 부재**: 분산 시스템에서 콜백(네트워크)은 언젠가 유실된다는 전제가 필요한데, "유실됐을 때 되돌아오는 장치"가 없었다. at-least-once 수신(9-1 멱등)만으론 "아예 안 온 경우"를 못 구한다.
+- **트리거 타이밍**: `@Async` 메서드를 트랜잭션 커밋 **전에** 호출하면, 커밋 안 된 데이터를 다른 스레드가 못 봐서 상태 전이가 유실될 수 있다(전형적 Spring @Async+@Transactional 함정). `submitImage`만 `afterCommit`으로 올바르게 띄우고 있었고 `submitText`/`submitUrl`은 아니었다(비일관).
+
+#### 3) 해결법 파악
+- **(a) afterCommit 트리거**: 후속 비동기 작업(분석 요청)은 **트랜잭션 커밋 후**에 띄운다 → 커밋 전 실행 race 제거. 세 진입점(text/url/image)을 `runAfterCommit(Runnable)` 헬퍼로 **일관 통일**.
+- **(b) 재조정 스위퍼**: `@Scheduled` 배치가 임계시간(기본 10분) 넘게 미완료(PENDING/ANALYZING)인 기사를 찾아 **FAILED로 전이** → 사용자가 명확한 실패를 보고 재시도(9-3 덕에 재시도 정상). 전이는 **조건부 UPDATE(9-2)** 를 재사용해, 스윕 직전 도착한 정상 DONE 콜백을 덮지 않음(0행 스킵).
+- **DONE 결과 복구(FAILED 대신)** 는 `task_id` 저장 + AI `/status/{taskId}` 폴링이 필요 → **9-4c로 이월**(AI 엔진 협조). 지금은 "stuck 탈출(FAILED 재조정)"이라는 핵심 안전망부터 확보. taskId 컬럼은 폴링과 함께 쓰일 때만 의미 있으므로 지금 넣지 않음(죽은 컬럼 방지).
+
+#### 4) 해결법 적용 및 확인
+- `FactcheckApplication`: `@EnableScheduling` 추가.
+- `ArticleService`: `runAfterCommit(Runnable)` 헬퍼 신설 + `submitText`/`submitUrl`의 `aiWorkerClient.submitAnalysis(...)`를 afterCommit으로 이동. `submitImage`도 헬퍼로 리팩터(동일 동작, 중복 제거).
+- `ArticleRepository`: `findStuck(statuses, threshold, Pageable)` 쿼리 신설(오래된 순, 배치 상한).
+- `StuckAnalysisSweeper`(신규 `@Component`): `@Scheduled(fixedDelay 기본 60s)` `sweep()` — stuck 후보를 `statusWriter.updateStatus(id, 현재상태, FAILED)`로 조건부 전이 + WARN 로그 + 스윕 요약 로그. 튜닝 키(기본값 내장): `analysis.sweeper.stuck-minutes(10)`, `batch-size(100)`, `interval-ms(60000)`.
+- 확인(정적): `./gradlew compileJava` 성공(EXIT=0).
+- 확인(동작, **예정**): 콜백을 일부러 누락시켜(AI가 콜백 안 쏘게) ANALYZING 방치 → 임계시간 후 스위퍼가 FAILED 전이하는지 로그로 확인. `stuck 분석 재조정` WARN 카운트를 Micrometer 지표화 예정.
+
+#### 교훈
+- **네트워크 경계의 비동기 결과는 "재조정(reconciliation) 루프"로 최종 일관성을 보장한다.** 재시도(9-5)·멱등(9-1)이 정상 경로를 지키고, 스위퍼는 "그래도 새어나간" 경우를 뒤에서 줍는 최후 안전망. 세 개가 층을 이룬다.
+- **@Async 트리거는 항상 afterCommit에서.** 트랜잭션 커밋 전에 비동기 작업을 띄우면 "아직 없는 데이터"를 두고 경쟁한다.
