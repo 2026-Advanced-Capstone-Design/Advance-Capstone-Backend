@@ -16,8 +16,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.DigestUtils;
 
 import java.util.List;
 
@@ -30,6 +32,7 @@ public class AnalysisCallbackService {
     private final AnalysisResultRepository analysisResultRepository;
     private final AnalysisSectionRepository analysisSectionRepository;
     private final SentenceAnalysisRepository sentenceAnalysisRepository;
+    private final AnalysisCacheWriter analysisCacheWriter;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional
@@ -102,6 +105,19 @@ public class AnalysisCallbackService {
         }
 
         article.updateStatus(ArticleStatus.DONE);
+
+        // URL 입력 기사면 결과를 캐시에 기록한다. 캐싱 시점이 DONE 직후이므로 "완료된 분석"만 캐시에 들어가고,
+        // 미완료(ANALYZING)·실패(FAILED) 기사는 절대 캐시로 서빙되지 않는다(결함 B 차단).
+        // 캐시는 최적화라 실패해도 결과 저장/DONE 전이엔 영향이 없어야 하므로 별도 tx + best-effort로 처리.
+        if (article.getSourceUrl() != null && !article.getSourceUrl().isBlank()) {
+            String urlHash = DigestUtils.md5DigestAsHex(article.getSourceUrl().getBytes());
+            try {
+                analysisCacheWriter.cacheDoneResult(urlHash, article.getId());
+            } catch (DataIntegrityViolationException e) {
+                log.warn("캐시 저장 경합으로 스킵: articleId={}, urlHash={}", article.getId(), urlHash);
+            }
+        }
+
         log.info("AI 분석 완료 저장: articleId={}", req.getArticleId());
     }
 

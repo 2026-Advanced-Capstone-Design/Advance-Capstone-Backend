@@ -162,7 +162,9 @@
 - `AnalysisResultRepository.java`: 멱등 가드용 `existsByArticleId(Long)` 쿼리 추가(`SELECT COUNT(r) > 0 ...`).
 - `AnalysisCallbackService.handleCallback`: `findById` 직후 **가드 삽입** — `existsByArticleId`면 로그 남기고 `return`(FAILED 분기보다 앞이라, 늦게 온 FAILED가 이미 DONE을 덮지도 못함).
 - 확인(정적): `./gradlew compileJava` 성공(EXIT=0).
-- 확인(동작, **예정**): 같은 콜백 바디를 2회 POST → 1회차 정상 저장/DONE, 2회차 "중복 콜백 무시" 로그 + 결과 1건 유지 + 조회 200. Micrometer 카운터(중복 콜백 수)로 관측 예정.
+- 확인(동작, **완료 2026-07-10**): `scripts/demo-phase9.sh a`로 before/after 로컬 재현·촬영.
+  - **before**(`9314f69`): 2회차 콜백 **HTTP 500**(제어 안 된 `ConstraintViolationException`) — 예상했던 "행 2개 + 조회 500"이 아니라 **@OneToOne이 만든 자동 UNIQUE가 DB에서 이미 막고 있었음**(→ 사례 11 발견 3, 감사 내용 정정).
+  - **after**(develop): 1·2회차 모두 200, 2회차는 `중복 콜백 무시 (분석 결과 이미 존재): articleId=1` INFO 로그, 결과행 1건, 조회 200. Micrometer 카운터(중복 콜백 수)는 추후 지표화.
 - ⚠️ **운영 주의(migration)**: 현재 스키마는 Flyway 없이 `ddl-auto: update`. Hibernate `update`는 **기존 MySQL 테이블의 컬럼에 UNIQUE 제약을 자동 추가하지 못할 수 있다**(새로 만드는 테이블엔 적용). 이미 운영 중인 DB에는 수동 DDL 필요:
   ```sql
   ALTER TABLE analysis_results ADD CONSTRAINT uk_analysis_results_article UNIQUE (ARTICLE_ID);
@@ -210,3 +212,147 @@
 #### 교훈
 - **동시성 정합성은 "타이밍이 맞기를 바라는 것"이 아니라 "순서와 무관하게 옳게" 만드는 것.** 상태 머신 전이는 선행 상태를 조건으로 건 **조건부 UPDATE(CAS)** 로 표현하면 락 없이 원자적으로 안전해진다.
 - 갱신 **행 수(0/1)를 반환·로깅**하면 "전이가 조용히 무시된" 사건을 관측할 수 있어, 숨은 경합을 지표로 드러낼 수 있다.
+
+---
+
+## 2026-07-05 — Phase 9-3: 캐시가 미완료/실패 분석을 서빙하던 문제
+
+### 사례 9 — 한 번 실패한 URL이 7일간 고장 상태로 재사용
+
+#### 1) 문제 발견
+- `submitUrl`이 **분석 완료를 기다리지 않고** 크롤링 직후 `AnalysisCache`를 저장했다. 그래서 그 기사가 `ANALYZING`(진행중)이거나 `FAILED`(실패)여도, 캐시 유효기간(7일) 동안 같은 URL 요청이 **그 고장난 기사를 히트로 반환** → 실패한 URL을 7일 내내 못 고침. (2026-07-03 감사, 문제 B)
+- 근거: `ArticleService.submitUrl`이 `articleRepository.save` 직후 `analysisCacheRepository.save(...)`(완료 전) + `AnalysisCache.url_hash`에 UNIQUE 없음(동시요청 시 중복행/스탬피드 + `findByUrlHash` NonUniqueResult 위험).
+
+#### 2) 원인 분석
+- 캐시에 넣는 **시점이 틀렸다.** "요청 접수 시점"에 넣으니 아직 결과가 없는(또는 앞으로 실패할) 기사가 캐시에 박힘. 캐시의 의미는 "**완료된 결과의 재사용**"인데, 미완료 상태를 캐싱한 것.
+- 읽는 쪽도 **상태를 안 봤다.** `!expired`만 보고 히트 처리 → 상태가 뭐든 그냥 반환.
+- `url_hash` 유일성 미보장 → 동시 요청이 각자 캐시행을 만들어 중복/스탬피드.
+
+#### 3) 해결법 파악
+- **쓰기 시점 이동**: 캐시는 **콜백에서 DONE 처리 직후에만** 저장. 그러면 캐시에는 완료된 기사만 들어간다("DONE일 때만 유효"를 시점으로 보장).
+- **읽기 가드**: `submitUrl` 히트 조건에 `status == DONE` 추가(과거 오염된 레거시 캐시행도 자동 무시 → 재분석 유도).
+- **유일성**: `url_hash` UNIQUE. 재분석 시엔 기존 행을 **`refresh()`로 갱신**(새 기사로 교체 + TTL 리셋)해 UNIQUE와 공존.
+- **캐시 실패 격리**: 캐시는 최적화이므로 그 쓰기 실패가 **결과 저장/DONE 전이를 롤백시키면 안 된다.** → 별도 빈 `AnalysisCacheWriter`에서 `REQUIRES_NEW` 독립 tx로 수행하고, 동시요청 UNIQUE 위반은 상위에서 `DataIntegrityViolationException`를 잡아 best-effort로 무시.
+- 완전한 스탬피드 차단(같은 새 URL 동시요청 시 분석 1회로 병합)은 분산락/single-flight가 필요 → **범위 밖(추후)**. 지금은 "중복행/실패서빙" 정합성만 확실히 잡음.
+
+#### 4) 해결법 적용 및 확인
+- `AnalysisCache`: `url_hash`에 `unique = true` + `refresh(Article)` 메서드(재분석 시 갱신).
+- `AnalysisCacheWriter`(신규): `@Transactional(REQUIRES_NEW)` `cacheDoneResult(urlHash, articleId)` — `findByUrlHash` upsert(있으면 refresh, 없으면 save). `getReferenceById`로 FK만 참조(교차 영속성 컨텍스트 회피).
+- `AnalysisCallbackService.handleCallback`: DONE 처리 직후, URL 입력 기사면 `analysisCacheWriter.cacheDoneResult(...)` 호출(try/catch로 UNIQUE 경합 무시).
+- `ArticleService.submitUrl`: 히트 조건에 `status == DONE` 필터 추가 + **submit 시점 캐시 save 제거**(안 쓰게 된 AnalysisCache import 정리).
+- 확인(정적): `./gradlew compileJava` 성공(EXIT=0).
+- 확인(동작, **예정**): (a) 분석 실패 후 같은 URL 재요청 → 캐시 히트 아님, 재분석됨. (b) DONE 후 같은 URL → 히트(hit_count 증가). (c) 동시 2요청 → 캐시행 1개 유지.
+- ⚠️ **운영 주의(migration)**: 9-1과 동일. `ddl-auto: update`는 기존 테이블에 UNIQUE 자동 추가 못할 수 있음 → 수동 DDL + 기존 중복 url_hash 정리 필요:
+  ```sql
+  ALTER TABLE analysis_cache ADD CONSTRAINT uk_analysis_cache_url_hash UNIQUE (url_hash);
+  ```
+
+#### 교훈
+- **캐시에는 "완료·성공한 결과"만 넣는다.** 진행중/실패 상태를 캐싱하면 실패가 TTL만큼 굳어버린다. 쓰기 시점을 라이프사이클의 올바른 지점(완료)으로 옮기는 게 읽기 필터보다 근본적.
+- **캐시 쓰기는 주 트랜잭션에서 격리(best-effort)한다.** 최적화가 실패해도 본질(결과 저장)은 성공해야 한다.
+
+---
+
+## 2026-07-05 — Phase 9-4: 유실된 콜백 재조정(스위퍼) + afterCommit 트리거
+
+### 사례 10 — 콜백이 유실되면 영구 "분석 중"에 갇히던 문제
+
+#### 1) 문제 발견
+- AI → Spring 콜백은 fire-and-forget이라, **콜백이 유실되거나 수신 중 Spring이 다운되면** 기사가 `ANALYZING`에 **영구히 갇힌다**(사용자 화면 계속 "분석 중"). 스스로 빠져나올 재조정 주체가 없음. (2026-07-03 감사, 문제 A2)
+- 여기에 9-2에서 발견한 **트리거 유실**까지 겹칠 수 있음: `submitText`/`submitUrl`이 커밋 전에 `@Async` 분석을 호출 → async가 커밋보다 먼저 돌면 ANALYZING 전이가 0행 → `PENDING`에 갇힘.
+
+#### 2) 원인 분석
+- **탈출 경로 부재**: 분산 시스템에서 콜백(네트워크)은 언젠가 유실된다는 전제가 필요한데, "유실됐을 때 되돌아오는 장치"가 없었다. at-least-once 수신(9-1 멱등)만으론 "아예 안 온 경우"를 못 구한다.
+- **트리거 타이밍**: `@Async` 메서드를 트랜잭션 커밋 **전에** 호출하면, 커밋 안 된 데이터를 다른 스레드가 못 봐서 상태 전이가 유실될 수 있다(전형적 Spring @Async+@Transactional 함정). `submitImage`만 `afterCommit`으로 올바르게 띄우고 있었고 `submitText`/`submitUrl`은 아니었다(비일관).
+
+#### 3) 해결법 파악
+- **(a) afterCommit 트리거**: 후속 비동기 작업(분석 요청)은 **트랜잭션 커밋 후**에 띄운다 → 커밋 전 실행 race 제거. 세 진입점(text/url/image)을 `runAfterCommit(Runnable)` 헬퍼로 **일관 통일**.
+- **(b) 재조정 스위퍼**: `@Scheduled` 배치가 임계시간(기본 10분) 넘게 미완료(PENDING/ANALYZING)인 기사를 찾아 **FAILED로 전이** → 사용자가 명확한 실패를 보고 재시도(9-3 덕에 재시도 정상). 전이는 **조건부 UPDATE(9-2)** 를 재사용해, 스윕 직전 도착한 정상 DONE 콜백을 덮지 않음(0행 스킵).
+- **DONE 결과 복구(FAILED 대신)** 는 `task_id` 저장 + AI `/status/{taskId}` 폴링이 필요 → **9-4c로 이월**(AI 엔진 협조). 지금은 "stuck 탈출(FAILED 재조정)"이라는 핵심 안전망부터 확보. taskId 컬럼은 폴링과 함께 쓰일 때만 의미 있으므로 지금 넣지 않음(죽은 컬럼 방지).
+
+#### 4) 해결법 적용 및 확인
+- `FactcheckApplication`: `@EnableScheduling` 추가.
+- `ArticleService`: `runAfterCommit(Runnable)` 헬퍼 신설 + `submitText`/`submitUrl`의 `aiWorkerClient.submitAnalysis(...)`를 afterCommit으로 이동. `submitImage`도 헬퍼로 리팩터(동일 동작, 중복 제거).
+- `ArticleRepository`: `findStuck(statuses, threshold, Pageable)` 쿼리 신설(오래된 순, 배치 상한).
+- `StuckAnalysisSweeper`(신규 `@Component`): `@Scheduled(fixedDelay 기본 60s)` `sweep()` — stuck 후보를 `statusWriter.updateStatus(id, 현재상태, FAILED)`로 조건부 전이 + WARN 로그 + 스윕 요약 로그. 튜닝 키(기본값 내장): `analysis.sweeper.stuck-minutes(10)`, `batch-size(100)`, `interval-ms(60000)`.
+- 확인(정적): `./gradlew compileJava` 성공(EXIT=0).
+- 확인(동작, **완료 2026-07-10**): `scripts/demo-phase9.sh b`로 before/after 로컬 재현·촬영 (`--analysis.sweeper.stuck-minutes=1 --analysis.sweeper.interval-ms=10000`으로 임계 단축).
+  - **before**(`9314f69`): 콜백 유실 시뮬레이션(ANALYZING + 생성시각 5분 전) → **90초 폴링 내내 ANALYZING** (영구 stuck).
+  - **after**(develop): 폴링 2번째(5초)만에 **FAILED 자동 전이**. 로그: `stuck 분석 재조정: articleId=2, ANALYZING → FAILED (생성 후 1분 초과 미완료)` WARN + `stuck 분석 스윕 완료: 후보 1건 중 1건 FAILED 전이` INFO. WARN 카운트 Micrometer 지표화는 추후.
+
+#### 교훈
+- **네트워크 경계의 비동기 결과는 "재조정(reconciliation) 루프"로 최종 일관성을 보장한다.** 재시도(9-5)·멱등(9-1)이 정상 경로를 지키고, 스위퍼는 "그래도 새어나간" 경우를 뒤에서 줍는 최후 안전망. 세 개가 층을 이룬다.
+- **@Async 트리거는 항상 afterCommit에서.** 트랜잭션 커밋 전에 비동기 작업을 띄우면 "아직 없는 데이터"를 두고 경쟁한다.
+
+---
+
+## 2026-07-10 — Phase 9 before/after 시연 촬영 중 발견 3건
+
+### 사례 11 — 시연이 대신 찾아준 것들: curl 한글 깨짐, 스키마 잔재, @OneToOne의 숨은 UNIQUE
+
+> 배경: 9-1(멱등성)·9-4(스위퍼)의 before/after 증거를 `scripts/demo-phase9.sh`로 로컬 재현·촬영.
+> before = `git checkout 9314f69`(Phase 8 시점, 가드·스위퍼 없음), after = develop. 로컬 MySQL + `ddl-auto: create`.
+> 첫 실행에서 "콜백 1회차부터 500 + 결과행 0"이라는 **예상 밖 실패**가 났고, 원인을 파다가 3가지를 발견했다.
+
+#### 발견 1 — Windows curl이 한글 인자를 CP949로 변환 → JSON 파싱 500
+- **증상**: 콜백 1회차부터 500. 로그: `JsonParseException: Invalid UTF-8 start byte 0xb5`.
+- **원인**: 스크립트 파일은 UTF-8이 맞지만, Git Bash가 **네이티브 Windows `curl.exe`에 인자를 넘길 때** 한글이 ANSI 코드페이지(**CP949**)로 변환된다. `0xB5`는 CP949 "데"의 첫 바이트. Spring은 UTF-8로 해석하므로 파싱 단계에서 즉사 — `handleCallback` 로직에 도달조차 못 했다.
+- **해결**: 데모 페이로드에서 한글 제거(`"데모 주제"` → `"phase9-demo-topic"`). Windows에서 curl로 non-ASCII 바디를 보낼 땐 **인자 대신 파일(`-d @file`)로** 넘기는 것이 안전.
+
+#### 발견 2 — `ddl-auto: create`가 옛 테이블 잔재의 FK에 막혀 스키마 재생성 실패
+- **증상**: 결과 조회 500. 로그: `Unknown column 'ar1_0.bias_confidence'` — 엔티티엔 있는 컬럼이 테이블에 없음.
+- **원인**: 로컬 DB에 **다른 브랜치/과거 스키마의 잔재**(`source_references` 등)가 남아 있었고, 그 테이블의 FK가 `analysis_results`를 참조 → `ddl-auto: create`의 DROP이 실패 → CREATE도 실패("already exists") → **낡은 테이블이 그대로 서빙**됨. `create`라고 항상 깨끗한 스키마를 보장하지 않는다.
+- **해결**: `DROP DATABASE factcheck; CREATE DATABASE ...` 후 앱 재기동. 시연·테스트용 로컬 DB는 의심스러우면 DB째 초기화가 확실하다.
+
+#### 발견 3 (핵심) — @OneToOne이 만들어둔 자동 UNIQUE: 감사 내용 정정
+- **증상**: DB 초기화 후 before 재실행 결과가 예상("콜백 2회 다 200 → 행 2개 → 조회 500")과 달랐다: **2회차 콜백이 500**(`ConstraintViolationException: Duplicate entry ... UKgdfrjdt6a45b7tku3ofo5psjl`), 행 1개, 조회 200.
+- **원인**: `AnalysisResult.article`이 **`@OneToOne`** 인데, Hibernate는 @OneToOne @JoinColumn에 `unique = true`가 없어도 **DDL 생성 시 UNIQUE 제약을 자동 추가**한다. 즉 신규 생성 스키마에는 DB 방어선이 **처음부터 우연히 존재**했다.
+- **감사(7/3, A1) 정정**: "중복 콜백 → 행 2개 → `NonUniqueResultException`" 시나리오는 **UNIQUE가 없는 DB에서만** 성립한다(옛 스키마로 만들어진 뒤 `ddl-auto: update`로만 유지된 운영 DB가 정확히 그런 후보). 신규 스키마의 before 실체는 "**중복 콜백에 제어 안 된 500**"이다.
+- **그래도 9-1 수정이 필요한 이유** (발표 예상질문 "우연히 막혀 있는데 왜 고쳤나"의 답):
+  1. 500은 "막은 것"이지 "올바른 처리"가 아니다 — 이미 반영된 요청에 실패를 응답하면, 9-5 재시도가 붙는 순간 **성공한 분석이 "콜백 최종 실패"로 분류**되는 모순이 매번 발생(재시도는 중복이므로 영원히 500).
+  2. 에러 로그·에러율 지표가 가짜 장애로 오염된다(진짜 `ConstraintViolationException` 장애와 구분 불가).
+  3. 자동 UNIQUE는 **아무도 의도하지 않은 부산물** — 운영 DB엔 없을 수 있고, @OneToOne→@ManyToOne 리팩토링 한 번에 조용히 사라진다. 9-1이 `unique = true`를 명시한 것은 우연을 **의도된 계약으로 문서화**한 것.
+- **운영 액션**: 배포 전 운영 DB에서 `SHOW INDEX FROM analysis_results WHERE Non_unique=0;`으로 UNIQUE 존재를 **확인**할 것(없으면 9-1의 수동 DDL 실행).
+
+#### 교훈
+- **before/after 시연은 검증이자 발견 도구다.** "고쳤다"를 찍으러 갔다가 감사 내용의 부정확(발견 3)과 환경 함정 2개를 찾았다. 수정 후 재현 촬영을 생략했다면 몰랐을 것들.
+- **DB 제약과 앱 가드는 대체재가 아니라 보완재.** DB UNIQUE는 데이터 무결성(행이 안 깨짐)을, 앱 멱등 가드는 프로토콜 의미론(중복=성공 no-op)을 지킨다. 전자만 있으면 "데이터는 멀쩡한데 시스템은 서로 실패했다고 믿는" 상태가 된다.
+- **로컬 시연 환경도 프로덕션만큼 의심하라.** 인코딩(터미널→프로세스 경계), 스키마 잔재, ORM의 암묵적 DDL — 세 개 모두 "코드 밖"에서 온 함정이었다.
+
+---
+
+## 2026-07-11 — Phase 7~9 + FastAPI 전환 EC2 배포, 그리고 배포 검증이 잡아낸 버그
+
+### 사례 12 — Flask→FastAPI 전환 후 첫 실전 호출이 422로 터진 문제 (JDK HttpClient h2c vs uvicorn)
+
+#### 1) 문제 발견
+- Phase 7~9(백엔드)와 FastAPI 전환분+9-5(AI 엔진)를 EC2에 배포한 뒤 **end-to-end 검증**(텍스트 분석 제출→콜백→결과)을 돌리자, 기사가 5초 만에 `FAILED`.
+- 로그 2개가 단서:
+  - AI 엔진(uvicorn): `WARNING: Unsupported upgrade request.` / `Invalid HTTP request received.`
+  - 백엔드: `AI 서버 호출 실패: 422 Unprocessable Entity: {"detail":[{"type":"missing","loc":["body"],"msg":"Field required"}]}` — **요청은 도착했는데 바디가 비어 있음**.
+
+#### 2) 원인 분석
+- 백엔드의 `aiRestClient`(Spring `RestClient`)는 **기본 설정** → 내부적으로 JDK `java.net.http.HttpClient` 사용.
+- JDK HttpClient의 **기본 프로토콜은 HTTP/2**. 평문 `http://` 대상에는 HTTP/2로 직접 시작할 수 없어, HTTP/1.1 요청에 **`Upgrade: h2c` + `HTTP2-Settings` 협상 헤더를 자동으로 끼워** 보낸다.
+- 서버별 반응이 갈렸다:
+  - **옛 Flask(gunicorn sync)**: 모르는 헤더 무시하고 바디 처리 → 지금까지 정상 동작(문제 잠복).
+  - **새 FastAPI(uvicorn/h11)**: h2c 업그레이드 미지원 — 경고를 남기고 **요청 파싱이 깨져 바디가 유실** → FastAPI가 "body Field required" 422.
+- 즉 **호출 코드도, API 계약도 안 바뀌었는데 서버 구현체 교체만으로 터진 통합 결함**. "인터페이스가 같으면 교체는 안전하다"는 가정이 프로토콜 협상 레벨에서 깨진 사례(추상화 누수).
+- **로컬 검증으로 원리적으로 못 잡았던 이유**: Phase 2 검증(TestClient 스모크, AI에 직접 curl, MOCK 부하)은 모두 "Spring RestClient → uvicorn" 경로가 아니었다. 이 조합은 백엔드 경유 실전 호출에서만 만들어지고, 그것이 배포 후 e2e 검증에서 처음 실행됐다.
+
+#### 3) 해결법 파악
+- 방향 후보: (a) 백엔드가 업그레이드 협상을 안 하게 HTTP/1.1 고정, (b) uvicorn 쪽에서 h2c 수용 — uvicorn은 h2c 미지원이라 불가, (c) 프록시 삽입 — 과함.
+- **(a) 채택**: `HttpClient.Version.HTTP_1_1` 명시. AI 엔진과의 통신은 내부망 단거리 호출이라 HTTP/2의 이점(멀티플렉싱)이 무의미하고, 협상 자체를 없애는 게 가장 단순·확실.
+
+#### 4) 해결법 적용 및 확인
+- `RestClientConfig.aiRestClient()`: `JdkClientHttpRequestFactory(HttpClient.newBuilder().version(HTTP_1_1).build())` 주입 + 이유 주석.
+- 재배포 후 동일 e2e 재실행: 제출 → ANALYZING → **20초 만에 DONE** → 결과 200. 콜백 지표 `ai_callback_retry_total=0`, `ai_callback_final_failure_total=0`(정상 네트워크 1회 전달).
+
+#### 같은 날 배포에서 확인·조치한 것 (기록)
+- **운영 DB DDL**: `analysis_results.article_id` UNIQUE는 **이미 존재**(@OneToOne 자동 생성 — 사례 11 발견 3이 운영에서도 확인됨, 최악 시나리오는 운영에 없었음). `analysis_cache.url_hash`는 UNIQUE 없음 + **실제 중복 1쌍 발견**(같은 URL 동시요청 스탬피드의 실물 증거) → 최신 행만 남기고 정리 후 `uk_analysis_cache_url_hash` 추가.
+- **EC2 운영 메모**: 이 인스턴스는 `docker compose`(공백) 미지원 — **`docker-compose`(하이픈)** 사용. 접속 계정은 `ubuntu`.
+
+#### 교훈
+- **배포 후 end-to-end 검증은 선택이 아니다.** 단위·MOCK·직접호출 검증을 다 통과해도, 실전 조합(클라이언트 구현체 × 서버 구현체)은 e2e에서만 만들어진다. 이번 버그는 e2e 검증이 없었으면 사용자가 처음 발견했을 것.
+- **프레임워크 기본값을 모르면 그게 잠복 버그다.** curl의 CP949 인자 변환, @OneToOne의 자동 UNIQUE, JDK HttpClient의 h2c 협상 — 이틀간 잡은 세 사고 모두 "내가 쓴 코드 바깥의 기본값"이 원인이었다.
+- **구성요소를 교체하면 그 컴포넌트의 "관용(tolerance)"도 함께 사라질 수 있다.** 옛 서버가 조용히 눈감아주던 비표준 동작이 무엇이었는지는, 교체 후에야 드러난다.
