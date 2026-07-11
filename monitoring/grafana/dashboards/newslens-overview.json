@@ -117,6 +117,73 @@
           "legendFormat": "ERROR/min"
         }
       ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "HikariCP 커넥션 풀 (Phase 8 실측)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "hikaricp_connections_active{job=\"backend\"}",
+          "legendFormat": "active (사용 중)"
+        },
+        {
+          "refId": "B",
+          "expr": "hikaricp_connections_pending{job=\"backend\"}",
+          "legendFormat": "pending (대기 스레드)"
+        },
+        {
+          "refId": "C",
+          "expr": "hikaricp_connections_max{job=\"backend\"}",
+          "legendFormat": "max (풀 상한)"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "콜백 재시도 (ai_callback_retry, 5분 증가량)",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "increase(ai_callback_retry_total{job=\"ai-engine\"}[5m])",
+          "legendFormat": "retries / 5m"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "콜백 최종 실패 누적 (0이어야 정상)",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(ai_callback_final_failure_total{job=\"ai-engine\"}) or vector(0)",
+          "legendFormat": "final failures"
+        }
+      ]
     }
   ]
 }
