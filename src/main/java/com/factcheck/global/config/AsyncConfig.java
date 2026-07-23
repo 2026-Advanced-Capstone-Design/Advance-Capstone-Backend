@@ -5,6 +5,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+import java.util.concurrent.ThreadPoolExecutor;
+
 @Configuration
 @EnableAsync
 
@@ -23,6 +25,12 @@ public class AsyncConfig {
         executor.setMaxPoolSize(8);
         executor.setQueueCapacity(100);
         executor.setThreadNamePrefix("ai-worker-");
+        // 거부정책(Phase 3): 기본 AbortPolicy는 큐 초과 시 예외 → 제출 요청이 500으로 터지고
+        // 해당 분석은 영구 유실(PENDING stuck → 스위퍼가 FAILED 처리)된다.
+        // CallerRunsPolicy는 초과분을 호출 스레드(Tomcat 요청 스레드)가 직접 실행 —
+        // Phase 8 이후 submitAnalysis는 짧은 UPDATE + 즉시 202를 받는 빠른 HTTP뿐이라
+        // 요청 스레드가 수십 ms 느려지는 대신 작업 유실이 없고, 자연스러운 백프레셔가 된다.
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;
     }
@@ -34,6 +42,8 @@ public class AsyncConfig {
         executor.setMaxPoolSize(4);
         executor.setQueueCapacity(50);
         executor.setThreadNamePrefix("ocr-");
+        // OCR도 동일 — 큐 초과 시 요청 스레드에서 실행(느려질 뿐 유실 없음).
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;
     }

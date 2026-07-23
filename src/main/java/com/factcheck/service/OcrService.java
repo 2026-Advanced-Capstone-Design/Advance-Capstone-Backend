@@ -43,11 +43,28 @@ public class OcrService {
 
     private final RestTemplate visionRestTemplate;
 
+    /**
+     * 재사용하는 단일 Tesseract 인스턴스 (Phase 3).
+     * 이전에는 호출마다 {@code new Tesseract()}를 만들어 네이티브 리소스(tessdata 사전,
+     * libtesseract 핸들)를 반복 로드했다 — JVM 힙 밖(네이티브) 메모리라 GC가 회수하지 못해
+     * OCR 요청이 쌓일수록 프로세스 RSS가 계속 커지는 누수 패턴.
+     * Tess4J의 Tesseract는 스레드 안전하지 않으므로 사용 시 동기화한다(ocrExecutor 2~4스레드).
+     */
+    private Tesseract tesseract;
+
     public OcrService() {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(5000);
         factory.setReadTimeout(30000);
         this.visionRestTemplate = new RestTemplate(factory);
+    }
+
+    @jakarta.annotation.PostConstruct
+    void initTesseract() {
+        tesseract = new Tesseract();
+        tesseract.setDatapath(tessdataPath);
+        tesseract.setLanguage(ocrLanguage);
+        tesseract.setPageSegMode(3);
     }
 
     public String extractText(MultipartFile imageFile) throws IOException {
@@ -101,18 +118,17 @@ public class OcrService {
     }
 
     private String runTesseract(File imageFile) {
-        Tesseract tesseract = new Tesseract();
-        tesseract.setDatapath(tessdataPath);
-        tesseract.setLanguage(ocrLanguage);
-        tesseract.setPageSegMode(3);
-
         try {
             BufferedImage image = ImageIO.read(imageFile);
             if (image == null) {
                 log.warn("Tesseract: 이미지 읽기 실패");
                 return "";
             }
-            return tesseract.doOCR(image);
+            // Tesseract 인스턴스는 스레드 비안전 → OCR 구간만 직렬화.
+            // t2.micro는 vCPU 1이라 OCR(네이티브 CPU 바운드) 병렬화 실익도 없다.
+            synchronized (tesseract) {
+                return tesseract.doOCR(image);
+            }
         } catch (TesseractException | IOException e) {
             log.warn("Tesseract OCR 실패: {}", e.getMessage());
             return "";

@@ -73,7 +73,7 @@ public class ArticleService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESULT_NOT_FOUND));
     }
 
-    // ── 입력 타입별 처리 ──────────────────────────────────────────────
+    // 입력 타입별 처리
 
     @Transactional
     public AnalyzeResponse submitText(TextRequest request) {

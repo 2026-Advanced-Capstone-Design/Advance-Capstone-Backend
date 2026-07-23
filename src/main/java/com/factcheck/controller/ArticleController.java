@@ -28,7 +28,6 @@ public class ArticleController {
 
     /**
      * 텍스트 분석 요청
-     * POST /api/v1/articles/analyze/text
      * Content-Type: application/json
      * Body: { "text": "기사 본문..." }
      */
@@ -41,7 +40,6 @@ public class ArticleController {
 
     /**
      * URL 분석 요청
-     * POST /api/v1/articles/analyze/url
      * Content-Type: application/json
      * Body: { "url": "https://..." }
      */
@@ -54,7 +52,6 @@ public class ArticleController {
 
     /**
      * 이미지 분석 요청 (다중 이미지 지원)
-     * POST /api/v1/articles/analyze/image
      * Content-Type: multipart/form-data
      * Form: image (파일 1개 이상, 같은 키 반복 전송)
      */
