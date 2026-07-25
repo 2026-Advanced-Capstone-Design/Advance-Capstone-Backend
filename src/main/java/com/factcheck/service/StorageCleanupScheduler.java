@@ -18,15 +18,14 @@ import java.time.temporal.ChronoUnit;
 import java.util.stream.Stream;
 
 /**
- * 저장 공간 정리 스케줄러 (Phase 3 — 메모리/저장소 무한 증가 차단).
- *
- * <p>AnalysisCache는 {@code expires_at}(7일)이 있고 조회 경로가 {@code isExpired()}로
- * 만료를 걸러내지만, <b>행을 지우는 주체가 없어</b> 테이블이 무한히 커진다.
+ * 저장 공간 정리 스케줄러 ->  메모리 누수 차단
+ * AnalysisCache는 expires_at 및 조회 경로가  isExpired()로
+ * 만료를 걸러내지만, 행을 지우는 주체가 없어 메모리 누수 발생
  * t2.micro 동거 MySQL에서 테이블 비대는 버퍼풀 압박 → 전체 성능 저하로 이어지므로
  * 만료 행을 주기적으로 벌크 삭제한다.
  *
- * <p>새벽 시간 cron 기본값 — 삭제는 수 ms짜리 벌크 DELETE 하나라 부하 영향은 거의 없지만,
- * 습관적으로 트래픽이 가장 적은 시간대에 둔다.
+ * 새벽 시간 cron 기본값 —
+
  */
 @Slf4j
 @Component
@@ -81,7 +80,7 @@ public class StorageCleanupScheduler {
                     deleted++;
                     freedBytes += size;
                 } catch (IOException e) {
-                    // 파일 하나가 실패해도(사용 중 등) 나머지 정리는 계속한다.
+                    // 파일 하나가 실패해도 나머지 정리는 계속한다.
                     log.warn("업로드 파일 삭제 실패: {} ({})", file.getFileName(), e.getMessage());
                 }
             }

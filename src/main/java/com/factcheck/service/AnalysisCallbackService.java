@@ -40,9 +40,8 @@ public class AnalysisCallbackService {
         Article article = articleRepository.findById(req.getArticleId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.ARTICLE_NOT_FOUND));
 
-        // 멱등성 가드: 이미 결과가 저장돼 있으면(=이전 콜백이 성공 처리됨) 중복 콜백이므로 조용히 무시한다.
-        // 분산 환경에서 콜백은 유실·중복될 수 있어(at-least-once), 받는 쪽이 몇 번 와도 안전해야 한다.
-        // 최종 방어선은 ARTICLE_ID UNIQUE(DB)이고, 이 가드는 정상 흐름에서 중복 INSERT/500을 예방한다.
+        // 멱등성 가드: 이미 결과가 저장돼 있으면 중복 콜백이므로 조용히 무시한다.
+        // 분산 환경에서 콜백은 유실·중복될 수 있어, 받는 쪽이 몇 번 와도 안전해야 한다.
         if (analysisResultRepository.existsByArticleId(req.getArticleId())) {
             log.info("중복 콜백 무시 (분석 결과 이미 존재): articleId={}", req.getArticleId());
             return;
@@ -106,9 +105,8 @@ public class AnalysisCallbackService {
 
         article.updateStatus(ArticleStatus.DONE);
 
-        // URL 입력 기사면 결과를 캐시에 기록한다. 캐싱 시점이 DONE 직후이므로 "완료된 분석"만 캐시에 들어가고,
-        // 미완료(ANALYZING)·실패(FAILED) 기사는 절대 캐시로 서빙되지 않는다(결함 B 차단).
-        // 캐시는 최적화라 실패해도 결과 저장/DONE 전이엔 영향이 없어야 하므로 별도 tx + best-effort로 처리.
+        // URL 입력 기사면 결과를 캐시에 기록한다. 캐싱 시점이 DONE 직후이므로 완료된 분석만 캐시에 들어가고,
+        // 미완료·실패 기사는 절대 캐시로 서빙되지 않는다
         if (article.getSourceUrl() != null && !article.getSourceUrl().isBlank()) {
             String urlHash = DigestUtils.md5DigestAsHex(article.getSourceUrl().getBytes());
             try {

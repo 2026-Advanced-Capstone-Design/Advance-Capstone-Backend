@@ -95,10 +95,12 @@ public class ArticleService {
         String urlHash = DigestUtils.md5DigestAsHex(url.getBytes());
 
         return analysisCacheRepository.findByUrlHash(urlHash)
+                // 캐시가 만료 되지 않은 경우만
                 .filter(cache -> !cache.isExpired())
-                // DONE된 기사만 캐시 히트로 인정. 진행중(ANALYZING)/실패(FAILED) 기사는 캐시로 서빙하지 않는다
-                // → 한 번 실패한 URL이 7일간 고장 상태로 재사용되던 결함(B) 차단. (캐시 저장은 콜백 DONE 시점)
+                // DONE된 기사만 캐시 히트로 인정.
+                // 왜? 분석중이나, 실패 기사를 캐시로 넣으면 고장난 기사만 쓰게 되니깐
                 .filter(cache -> cache.getArticle().getStatus() == ArticleStatus.DONE)
+
                 .map(cache -> {
                     cache.incrementHitCount();
                     return new AnalyzeResponse(cache.getArticle());
@@ -120,7 +122,8 @@ public class ArticleService {
                     articleRepository.save(article);
 
                     // 캐시는 분석이 DONE된 뒤(콜백)에 저장한다. 여기서 미리 저장하면 미완료/실패 결과가 캐시된다.
-                    // 분석 트리거는 커밋 후에(afterCommit) — 커밋 전 @Async 실행 시 ANALYZING 전이 유실 방지.
+                    // 분석 트리거는 커밋 후에 AI 서버로 보낸다. 왜지? @Async는 즉시 다른 스레드로 넘어가는데
+                    // 커밋 전에 띄우게 된다면?  그 스레드가 아직 저장 안 된 기사를 못 봐서
                     runAfterCommit(() -> aiWorkerClient.submitAnalysis(article));
                     return new AnalyzeResponse(article);
                 });

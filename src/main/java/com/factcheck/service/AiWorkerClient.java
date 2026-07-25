@@ -17,9 +17,9 @@ import org.springframework.web.client.RestClientException;
 @Service
 public class AiWorkerClient {
 
-    private final RestClient aiRestClient;
-    private final ArticleStatusWriter statusWriter;
-    private final MeterRegistry meterRegistry;
+    private final RestClient aiRestClient; // Flask에 HTTP 요청 보내는 클라이언트
+    private final ArticleStatusWriter statusWriter; // 기사 상태를 짧은 트랜잭션으로 UPDATE
+    private final MeterRegistry meterRegistry; //프로메테우스용 지표수집
 
     public AiWorkerClient(@Qualifier("aiRestClient") RestClient aiRestClient,
                           ArticleStatusWriter statusWriter,
@@ -32,14 +32,11 @@ public class AiWorkerClient {
     /**
      * Flask /analyze 엔드포인트에 비동기로 분석 요청 전달
      * aiWorkerExecutor 스레드풀에서 실행하라는 선언
-     * AI 분석 요청을 동시에 최대 8개까지 병렬 처리 가능
+     * AI 분석 요청을 동시에 최대 8개까지 병렬 처리
      */
     @Async("aiWorkerExecutor")
     public void submitAnalysis(Article article) {
-        // 상태 UPDATE는 짧은 독립 트랜잭션(ArticleStatusWriter)에서 처리하고 즉시 커밋 → 커넥션 반납.
-        // 아래 AI /analyze HTTP 호출은 트랜잭션 밖이라 그 사이 DB 커넥션을 점유하지 않는다.
-        // (예전엔 메서드 전체가 @Transactional이라 HTTP 대기 내내 커넥션을 물어 HikariCP가 고갈됐다.)
-        // 조건부 전이(PENDING→ANALYZING): 이미 콜백이 DONE으로 끝낸 기사를 뒤늦게 ANALYZING으로 덮지 않는다(A4).
+
         statusWriter.updateStatus(article.getId(), ArticleStatus.PENDING, ArticleStatus.ANALYZING);
 
         AiAnalyzeRequest request = AiAnalyzeRequest.builder()
@@ -49,7 +46,7 @@ public class AiWorkerClient {
                 .sourceUrl(article.getSourceUrl())
                 .build();
 
-        // AI 호출 지연시간 측정 (지표: ai.analyze.request, 태그 outcome=success|failure)
+        // AI 호출 지연시간 측정
         Timer.Sample sample = Timer.start(meterRegistry);
         String outcome = "success";
         try {
@@ -61,19 +58,17 @@ public class AiWorkerClient {
                     .retrieve()
                     .body(AiAnalyzeResponse.class);
 
-            log.info("AI " +
-                            "" +
-                            "분석 요청 완료: articleId={}, taskId={}",
+            log.info("AI " + "" + "분석 요청 완료: articleId={}, taskId={}",
                     article.getId(), response != null ? response.getTaskId() : "null");
 
         } catch (RestClientException e) {
             outcome = "failure";
             log.error("AI 서버 호출 실패: articleId={}, error={}", article.getId(), e.getMessage());
-            // 조건부 전이(ANALYZING→FAILED): 이미 DONE/다른 상태면 덮지 않는다.
+            // 조건부 전이 :  이미 DONE/다른 상태면 덮지 않는다.
             statusWriter.updateStatus(article.getId(), ArticleStatus.ANALYZING, ArticleStatus.FAILED);
         } finally {
             sample.stop(Timer.builder("ai.analyze.request")
-                    .description("Flask AI 엔진 /analyze 호출 지연시간")
+                    .description("AI 엔진 /analyze 호출 지연시간")
                     .tag("outcome", outcome)
                     .publishPercentileHistogram()
                     .register(meterRegistry));
