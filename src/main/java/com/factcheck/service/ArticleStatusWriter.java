@@ -15,12 +15,6 @@ public class ArticleStatusWriter {
 
     private final ArticleRepository articleRepository;
 
-    /**
-     * 조건부 상태 전이. 기대된 상태일땜만 전이 한다.
-     * 순서가 엇갈려 커밋돼도, 늦게 온 전이가 앞선 전이를 덮어쓰지 못하게 한다
-     * ANALYZING은 PENDING에서만, FAILED는 ANALYZING에서만 → ANALYZING이 DONE을 절대 덮지 못함.
-     *
-     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean updateStatus(Long articleId, ArticleStatus expected, ArticleStatus next) {
         int updated = articleRepository.updateStatusIfCurrent(articleId, expected, next);

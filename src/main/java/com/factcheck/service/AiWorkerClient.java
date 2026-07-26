@@ -30,7 +30,6 @@ public class AiWorkerClient {
     }
 
     /**
-     * Flask /analyze 엔드포인트에 비동기로 분석 요청 전달
      * aiWorkerExecutor 스레드풀에서 실행하라는 선언
      * AI 분석 요청을 동시에 최대 8개까지 병렬 처리
      */

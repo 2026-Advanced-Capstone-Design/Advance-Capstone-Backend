@@ -51,6 +51,9 @@ dependencies {
 	runtimeOnly 'com.mysql:mysql-connector-j'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	// 테스트는 H2 인메모리로 격리한다. 운영 프로파일은 MySQL + ddl-auto: create 라
+	// 테스트가 로컬 스키마를 드롭·재생성하는 사고를 막기 위함(application-test.yaml).
+	testRuntimeOnly 'com.h2database:h2'
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'

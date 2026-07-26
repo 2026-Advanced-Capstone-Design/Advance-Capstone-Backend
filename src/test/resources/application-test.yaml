@@ -1,0 +1,26 @@
+# 테스트 전용 프로파일 — H2 인메모리
+#
+# 운영 application.yaml 은 MySQL(localhost:3306) + ddl-auto: create 다.
+# 이 프로파일 없이 테스트를 돌리면 로컬 factcheck 스키마가 드롭·재생성되므로,
+# 테스트는 외부 DB 없이 어디서든 동일하게 도는 H2로 분리한다.
+spring:
+  datasource:
+    url: jdbc:h2:mem:factcheck_test;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    show-sql: false
+    open-in-view: false
+
+# 스케줄러가 테스트 중 상태를 건드리지 않도록 주기를 충분히 늦춘다.
+analysis:
+  sweeper:
+    interval-ms: 3600000
+    stuck-minutes: 600
