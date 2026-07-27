@@ -83,8 +83,7 @@ public class ArticleService {
 
         Article article = request.toEntity(processed);
         articleRepository.save(article);
-        // 커밋 후에 분석을 트리거한다. @Async는 즉시 다른 스레드로 넘어가므로, 커밋 전에 호출하면
-        // 아직 안 보이는 기사에 대해 ANALYZING 전이가 0행이 되어 PENDING에 갇힐 수 있다(9-2 발견).
+
         runAfterCommit(() -> aiWorkerClient.submitAnalysis(article));
         return new AnalyzeResponse(article);
     }
@@ -121,9 +120,6 @@ public class ArticleService {
                     Article article = request.toEntity(title, processedText);
                     articleRepository.save(article);
 
-                    // 캐시는 분석이 DONE된 뒤(콜백)에 저장한다. 여기서 미리 저장하면 미완료/실패 결과가 캐시된다.
-                    // 분석 트리거는 커밋 후에 AI 서버로 보낸다. 왜지? @Async는 즉시 다른 스레드로 넘어가는데
-                    // 커밋 전에 띄우게 된다면?  그 스레드가 아직 저장 안 된 기사를 못 봐서
                     runAfterCommit(() -> aiWorkerClient.submitAnalysis(article));
                     return new AnalyzeResponse(article);
                 });
@@ -148,11 +144,7 @@ public class ArticleService {
         return new AnalyzeResponse(article);
     }
 
-    /**
-     * 현재 트랜잭션이 성공적으로 커밋된 뒤에 {@code action}을 실행한다.
-     * @Async 작업을 커밋 전에 트리거하면 아직 커밋 안 된 데이터를 다른 스레드가 못 보는 race가
-     * 생기므로, 후속 비동기 작업(분석 요청·OCR)은 반드시 afterCommit 시점에 띄운다.
-     */
+    // 현재 트랜젝션에 콜백을 등록,
     private void runAfterCommit(Runnable action) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -162,9 +154,6 @@ public class ArticleService {
         });
     }
 
-    // 자기호출(submitImage → 이 메서드)이라 @Transactional을 붙여도 프록시를 우회해 무효였다.
-    // 실제로는 호출자(submitImage)의 트랜잭션 안에서 실행되므로, 오해를 부르는 애노테이션을
-    // 제거하고 private 헬퍼로 정리한다. (Spring AOP 프록시 자기호출 함정)
     private Article saveImageArticle(String imagePath) {
         Article article = Article.createFromImage(imagePath, "");
         return articleRepository.save(article);
