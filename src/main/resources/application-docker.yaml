@@ -5,8 +5,11 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      maximum-pool-size: 30
-      minimum-idle: 10
+      # 30 → 15 축소(Phase 3): 30은 Phase 8 이전 커넥션 고갈을 풀 확대로 땜질하던 값.
+      # 트랜잭션 경계 정리 후 실측(2026-07-11, JMeter 500명)에서 active 최대 9 — 15면 충분하고
+      # 유휴 커넥션만큼 백엔드 스레드·MySQL 세션 메모리를 아낀다(t2.micro 동거 환경).
+      maximum-pool-size: 15
+      minimum-idle: 5
       connection-timeout: 5000
       idle-timeout: 600000
 

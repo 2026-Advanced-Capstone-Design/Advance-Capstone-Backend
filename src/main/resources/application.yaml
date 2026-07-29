@@ -15,6 +15,10 @@ spring:
     properties:
       hibernate:
         format_sql: true
+    # OSIV 비활성화(Phase 3): 기본값 true면 영속성 컨텍스트(+DB 커넥션 대여 가능 상태)가
+    # 응답 직렬화가 끝날 때까지 유지된다. 커넥션 점유 시간 최소화 원칙(Phase 8)과 동일 맥락 —
+    # 지연 로딩은 서비스 계층 트랜잭션 안에서 끝내고, 컨트롤러는 DTO만 다룬다.
+    open-in-view: false
 
   servlet:
     multipart:

@@ -130,7 +130,9 @@
   (실패 시) updateStatus(FAILED) → 짧은 tx 🔒🔓
   ```
 - 확인(정적): `./gradlew compileJava` 성공(EXIT=0). `article`의 스칼라 필드 접근은 detached 상태에서도 안전(원래도 `@Async`라 caller tx 미전파)이라 계약/동작 불변.
-- 확인(부하, **예정**): JMeter 부하 중 Grafana `hikaricp_connections_active`/`hikaricp_connections_pending` **before/after** 비교. AI 엔진을 `MOCK_DELAY_SECONDS`로 느리게 해 재현 → before는 active가 8에 붙고 pending 급증, after는 active 낮게 유지 예상. (Phase 2 세마포어 시연과 동일 방식)
+- 확인(부하, **완료 2026-07-11**): 두 갈래로 실측 — 상세와 원본 데이터·차트는 [`benchmarks/phase8-hikaricp/`](../benchmarks/phase8-hikaricp/README.md).
+  - **로컬 before/after 재현**: 현재 FastAPI 엔진은 `/analyze`가 202를 즉시 반환해 원 결함이 재현되지 않으므로, **10초 지연 스텁**으로 옛 동기 AI를 모사. before(`9314f69~1`) = 제출 108건 버스트 후 **active가 풀 상한 10에 ~135초 고정, pending 최대 98**(커넥션 대기 스레드 98개). after(현재) = 동일 부하에서 **pending 전 구간 0**, active는 버스트 순간만 스파이크 후 즉시 반납.
+  - **EC2 운영환경 실측(after)**: `MOCK_MODE=true`+`MOCK_DELAY_SECONDS=5`, JMeter 500명×10루프(5,000요청) — **에러 0.00%**(5월 기준선 8.58%), avg 16ms / p95 23ms, TPS 83.3, 부하 내내 `hikaricp_connections_pending=0`. "pool 30으로도 고갈"이던 문제가 **기본 pool 10으로 여유**임을 입증.
 
 #### 교훈
 - **트랜잭션 안에서 외부 I/O(HTTP/외부 API)를 호출하지 마라.** 커넥션은 "DB를 실제로 만지는 순간에만" 잡아야 한다. 느린 외부 호출을 tx로 감싸면 pool 크기를 아무리 키워도 동시성 한계에서 고갈된다.
